@@ -31,7 +31,7 @@ target_link_libraries(Engine PUBLIC
 	imgui
 	tinyobjloader
 	stb_image
-	fmt::fmt
+	fmt
 )
 
 add_dependencies(Engine Shaders)
@@ -48,12 +48,15 @@ target_precompile_headers(Engine PUBLIC
 	<vulkan/vulkan.h>
 )
 
-add_custom_command(TARGET Engine POST_BUILD
-	# COMMAND ${CMAKE_COMMAND} -E copy_if_different 
-	COMMAND ${CMAKE_COMMAND} -E copy 
-		$<TARGET_RUNTIME_DLLS:Engine>
-		$<TARGET_FILE_DIR:Engine>
-	COMMAND_EXPAND_LISTS
-)
+
+if (WIN32)
+	add_custom_command(TARGET Engine POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+			$<TARGET_RUNTIME_DLLS:Engine>
+			$<TARGET_FILE_DIR:Engine>
+		COMMAND_EXPAND_LISTS
+	)
+endif()
+
 
 

@@ -7,7 +7,7 @@ add_library(vma INTERFACE)
 add_library(stb_image INTERFACE)
 add_library(tinyobjloader STATIC)
 
-add_library(fmt INTERFACE)
+
 # add_subdirectory(fastgltf)
 # add_subdirectory(fmt EXCLUDE_FROM_ALL)
 add_subdirectory(SDL EXCLUDE_FROM_ALL)
@@ -29,6 +29,8 @@ target_sources(tinyobjloader PRIVATE
 target_include_directories(tinyobjloader PUBLIC tinyobjloader)
 
 
+add_library(fmt INTERFACE)
+target_include_directories(stb_image INTERFACE fmt)
 
 
 

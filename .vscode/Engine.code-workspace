@@ -147,8 +147,8 @@
 			{
 				"label": "Run Engine",
 				"type": "shell",
-				"command": "${workspaceFolder}/Binaries/${input:buildConfig}/Engine.sh",
-				"windows": {"command": "${workspaceFolder}/Binaries/${input:buildConfig}/Engine.exe"},
+				"command": "${workspaceFolder}/Binaries/${input:buildConfig}/Engine",
+				"windows": {"command": "${workspaceFolder}/Binaries/${input:buildConfig}/Engine"},
 				"options": {"cwd": "${workspaceFolder}/Binaries/${input:buildConfig}"},
 				"group": {"kind": "build"},
 				"detail": "Runs the compiled executables.",
