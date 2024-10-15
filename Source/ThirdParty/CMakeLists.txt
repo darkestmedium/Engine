@@ -5,8 +5,9 @@ add_library(glm INTERFACE)
 add_library(vma INTERFACE)
 
 add_library(stb_image INTERFACE)
-add_library(fmt INTERFACE)
+add_library(tinyobjloader STATIC)
 
+add_library(fmt INTERFACE)
 # add_subdirectory(fastgltf)
 # add_subdirectory(fmt EXCLUDE_FROM_ALL)
 add_subdirectory(SDL EXCLUDE_FROM_ALL)
@@ -18,6 +19,19 @@ target_sources(vkbootstrap PRIVATE
 target_include_directories(vkbootstrap PUBLIC vulkan/vkbootstrap)
 target_link_libraries(vkbootstrap PUBLIC Vulkan::Vulkan $<$<BOOL:UNIX>:${CMAKE_DL_LIBS}>)
 set_property(TARGET vkbootstrap PROPERTY CXX_STANDARD 20)
+
+
+
+target_sources(tinyobjloader PRIVATE 
+	tinyobjloader/tiny_obj_loader.h
+	tinyobjloader/tiny_obj_loader.cc
+)
+target_include_directories(tinyobjloader PUBLIC tinyobjloader)
+
+
+
+
+
 
 #both vma and glm and header only libs so we only need the include path
 # target_include_directories(vma INTERFACE "${PROJECT_SOURCE_DIR}/ThirdParty/vulkan/vma")

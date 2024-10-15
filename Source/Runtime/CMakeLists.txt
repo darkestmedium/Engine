@@ -29,7 +29,7 @@ target_link_libraries(Engine PUBLIC
 	glm
 	SDL3::SDL3
 	imgui
-	fastgltf::fastgltf
+	tinyobjloader
 	stb_image
 	fmt::fmt
 )
