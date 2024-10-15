@@ -1,0 +1,205 @@
+{
+	"folders":
+	[
+		{
+			"path": ".."
+		},
+		// {
+		// 	"path": "../../VulkanEngine"
+		// }
+	],
+
+	"settings": 
+	{
+		"files.associations": 
+		{
+			"memory": "cpp",
+			"string": "cpp",
+			"functional": "cpp",
+			"deque": "cpp",
+			"vector": "cpp",
+			"xiosbase": "cpp",
+			"filesystem": "cpp",
+			"iostream": "cpp",
+			"thread": "cpp",
+			"ios": "cpp",
+			"algorithm": "cpp",
+			"cmath": "cpp",
+			"any": "cpp",
+			"array": "cpp",
+			"atomic": "cpp",
+			"bit": "cpp",
+			"bitset": "cpp",
+			"cctype": "cpp",
+			"cfenv": "cpp",
+			"charconv": "cpp",
+			"chrono": "cpp",
+			"cinttypes": "cpp",
+			"clocale": "cpp",
+			"codecvt": "cpp",
+			"compare": "cpp",
+			"complex": "cpp",
+			"concepts": "cpp",
+			"condition_variable": "cpp",
+			"coroutine": "cpp",
+			"cstdarg": "cpp",
+			"cstddef": "cpp",
+			"cstdint": "cpp",
+			"cstdio": "cpp",
+			"cstdlib": "cpp",
+			"cstring": "cpp",
+			"ctime": "cpp",
+			"cwchar": "cpp",
+			"exception": "cpp",
+			"expected": "cpp",
+			"format": "cpp",
+			"forward_list": "cpp",
+			"fstream": "cpp",
+			"initializer_list": "cpp",
+			"iomanip": "cpp",
+			"iosfwd": "cpp",
+			"istream": "cpp",
+			"iterator": "cpp",
+			"limits": "cpp",
+			"list": "cpp",
+			"locale": "cpp",
+			"map": "cpp",
+			"memory_resource": "cpp",
+			"mutex": "cpp",
+			"new": "cpp",
+			"numeric": "cpp",
+			"optional": "cpp",
+			"ostream": "cpp",
+			"queue": "cpp",
+			"random": "cpp",
+			"ranges": "cpp",
+			"ratio": "cpp",
+			"set": "cpp",
+			"shared_mutex": "cpp",
+			"source_location": "cpp",
+			"span": "cpp",
+			"sstream": "cpp",
+			"stack": "cpp",
+			"stdexcept": "cpp",
+			"stdfloat": "cpp",
+			"stop_token": "cpp",
+			"streambuf": "cpp",
+			"system_error": "cpp",
+			"tuple": "cpp",
+			"type_traits": "cpp",
+			"typeindex": "cpp",
+			"typeinfo": "cpp",
+			"unordered_map": "cpp",
+			"utility": "cpp",
+			"variant": "cpp",
+			"xfacet": "cpp",
+			"xhash": "cpp",
+			"xlocale": "cpp",
+			"xlocbuf": "cpp",
+			"xlocinfo": "cpp",
+			"xlocmes": "cpp",
+			"xlocmon": "cpp",
+			"xlocnum": "cpp",
+			"xloctime": "cpp",
+			"xmemory": "cpp",
+			"xstring": "cpp",
+			"xtr1common": "cpp",
+			"xtree": "cpp",
+			"xutility": "cpp"
+		},
+		"cmake.buildDirectory": "${workspaceFolder}/Build"
+	},
+
+	"tasks": 
+	{
+		"version": "2.0.0",
+		"tasks": 
+		[
+			// Build
+			{
+				"label": "Build All",
+				"type": "shell",
+				"command": "cmake",
+				"args": 
+				[
+					"--build", "${workspaceFolder}/Build",
+					"--config", "${input:buildConfig}",
+					"--target", "BuildAll",
+				],
+				"group": {"kind": "build"},
+				"detail": "CMake build all targets task.",
+			},
+			// Launch Debug
+			{
+				"label": "Build All Debug",
+				"type": "shell",
+				"command": "cmake",
+				"args": 
+				[
+					"--build", "${workspaceFolder}/Build",
+					"--config", "Debug",
+					"--target", "BuildAll",
+				],
+				"group": {"kind": "build"},
+				"detail": "CMake build all debug targets task.",
+			},
+			// Run
+			{
+				"label": "Run Engine",
+				"type": "shell",
+				"command": "${workspaceFolder}/Binaries/${input:buildConfig}/Engine.sh",
+				"windows": {"command": "${workspaceFolder}/Binaries/${input:buildConfig}/Engine.exe"},
+				"options": {"cwd": "${workspaceFolder}/Binaries/${input:buildConfig}"},
+				"group": {"kind": "build"},
+				"detail": "Runs the compiled executables.",
+			},
+			// Build and run compound task
+			{
+				"label": "Build and Run",
+				"dependsOrder": "sequence",
+				"dependsOn": ["Build All", "Run Engine"],
+				"group": {"kind": "build"},
+				"detail": "Builds and runs the executables. ('Build All', 'Run Engine')",
+			}
+		],
+
+		// Inputs
+		"inputs": 
+		[
+			{
+				"id": "buildConfig",
+				"description": "Build configuration (Debug, Release, etc.):",
+				"default": "Debug",
+				"type": "promptString"
+			},
+		]
+	},
+
+	"launch": 
+	{
+		// Use IntelliSense to learn about possible attributes.
+		// Hover to view descriptions of existing attributes.
+		// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+		"version": "0.2.0",
+		"configurations":
+		[
+			{
+				"name": "Debug Engine",
+				"type": "cppvsdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/Binaries/Debug/Engine",
+				"args": [],
+				"stopAtEntry": false,
+				"cwd": "${workspaceFolder}/Binaries/Debug",
+				"environment": [],
+				"externalConsole": false,
+				"preLaunchTask": "Build All Debug",
+				// "setupCommands": [], // No setup commands needed for MSVC
+				"logging":
+				{
+					"engineLogging": false // Disable engine logging
+				}
+			}
+		]
+	}
+}
