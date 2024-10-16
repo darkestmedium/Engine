@@ -5,8 +5,4 @@
 
 #include <vulkan/vulkan.h>
 
-#define FMT_HEADER_ONLY
-#include <fmt/core.h>
-
-
 //we will add our main reusable types here
