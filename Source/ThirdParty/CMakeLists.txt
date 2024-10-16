@@ -1,17 +1,22 @@
 find_package(Vulkan REQUIRED)
 
-add_library(vkbootstrap STATIC)
-add_library(glm INTERFACE)
-add_library(vma INTERFACE)
 
-add_library(stb_image INTERFACE)
-add_library(tinyobjloader STATIC)
+add_library(fmt INTERFACE)
+
+#add_library(sdl2 INTERFACE)
+#target_include_directories(sdl2 INTERFACE $ENV{VULKAN_SDK}/Include/SDL2 )
+#target_link_directories(sdl2 INTERFACE $ENV{VULKAN_SDK}/Lib )
+#target_link_libraries(sdl2 INTERFACE SDL2 SDL2main)
+
+
+add_subdirectory(SDL EXCLUDE_FROM_ALL)
 
 
 # add_subdirectory(fastgltf)
-# add_subdirectory(fmt EXCLUDE_FROM_ALL)
-add_subdirectory(SDL EXCLUDE_FROM_ALL)
 
+
+# Vulkan Bootstrap
+add_library(vkbootstrap STATIC)
 target_sources(vkbootstrap PRIVATE 
   vulkan/vkbootstrap/VkBootstrap.h
   vulkan/vkbootstrap/VkBootstrap.cpp
@@ -21,7 +26,8 @@ target_link_libraries(vkbootstrap PUBLIC Vulkan::Vulkan $<$<BOOL:UNIX>:${CMAKE_D
 set_property(TARGET vkbootstrap PROPERTY CXX_STANDARD 20)
 
 
-
+# Tiny Obj Loader
+add_library(tinyobjloader STATIC)
 target_sources(tinyobjloader PRIVATE 
 	tinyobjloader/tiny_obj_loader.h
 	tinyobjloader/tiny_obj_loader.cc
@@ -29,25 +35,22 @@ target_sources(tinyobjloader PRIVATE
 target_include_directories(tinyobjloader PUBLIC tinyobjloader)
 
 
-add_library(fmt INTERFACE)
+# STB Image
+add_library(stb_image INTERFACE)
 target_include_directories(stb_image INTERFACE fmt)
 
 
-
-
-#both vma and glm and header only libs so we only need the include path
-# target_include_directories(vma INTERFACE "${PROJECT_SOURCE_DIR}/ThirdParty/vulkan/vma")
+# Vulkan Memory Allocator
+add_library(vma INTERFACE)
 target_include_directories(vma INTERFACE vulkan/vma)
 
+
+# OGL Math Library
+add_library(glm INTERFACE)
 target_include_directories(glm INTERFACE glm)
 
-#add_library(sdl2 INTERFACE)
 
-#target_include_directories(sdl2 INTERFACE $ENV{VULKAN_SDK}/Include/SDL2 )
-#target_link_directories(sdl2 INTERFACE $ENV{VULKAN_SDK}/Lib )
-
-#target_link_libraries(sdl2 INTERFACE SDL2 SDL2main)
-
+# IMGUI
 add_library(imgui STATIC)
 target_include_directories(imgui PUBLIC imgui)
 target_sources(imgui PRIVATE 
@@ -61,5 +64,4 @@ target_sources(imgui PRIVATE
   imgui/imgui_impl_sdl3.cpp
 )
 target_link_libraries(imgui PUBLIC Vulkan::Vulkan SDL3::SDL3)
-
 target_include_directories(stb_image INTERFACE stb_image)

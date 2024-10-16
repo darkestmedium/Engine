@@ -185,7 +185,7 @@
 		[
 			{
 				"name": "Debug Engine",
-				"type": "cppvsdbg",
+				"type": "cppdbg",
 				"request": "launch",
 				"program": "${workspaceFolder}/Binaries/Debug/Engine",
 				"args": [],
