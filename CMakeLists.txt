@@ -18,37 +18,43 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${PROJECT_SOURCE_DIR}/Binaries/Relea
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG "${PROJECT_SOURCE_DIR}/Binaries/Debug")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE "${PROJECT_SOURCE_DIR}/Binaries/Release")
 
-# Define the shader directory variable
-set(SHADER_DIR "${PROJECT_SOURCE_DIR}/shaders")
+set(SHADER_OUTPUT_DIR "${PROJECT_SOURCE_DIR}/Binaries/${CMAKE_BUILD_TYPE}/Shaders")
+message("Shaders output dir:  " ${SHADER_OUTPUT_DIR})
+
+
 
 add_subdirectory(Source)
 
-find_program(GLSL_VALIDATOR glslangValidator HINTS /usr/bin /usr/local/bin $ENV{VULKAN_SDK}/Bin/ $ENV{VULKAN_SDK}/Bin32/)
 
-# Use SHADER_DIR variable for shader file search
-file(GLOB_RECURSE GLSL_SOURCE_FILES
-  "${SHADER_DIR}/*.frag"
-  "${SHADER_DIR}/*.vert"
-  "${SHADER_DIR}/*.comp"
-)
+# Define the shader directory variable
+set(SHADER_DIR "${PROJECT_SOURCE_DIR}/Shaders")
 
-foreach(GLSL ${GLSL_SOURCE_FILES})
-  message(STATUS "BUILDING SHADERS")
-  get_filename_component(FILE_NAME ${GLSL} NAME)
-  set(SPIRV "${SHADER_DIR}/${FILE_NAME}.spv")
-  message(STATUS ${GLSL})
-  add_custom_command(
-    OUTPUT ${SPIRV}
-    COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}
-    DEPENDS ${GLSL})
-  list(APPEND SPIRV_BINARY_FILES ${SPIRV})
-endforeach(GLSL)
+# find_program(GLSL_VALIDATOR glslangValidator HINTS /usr/bin /usr/local/bin $ENV{VULKAN_SDK}/Bin/ $ENV{VULKAN_SDK}/Bin32/)
 
-# Create custom target for building shaders
-add_custom_target(
-  Shaders 
-  DEPENDS ${SPIRV_BINARY_FILES}
-)
+# # Use SHADER_DIR variable for shader file search
+# file(GLOB_RECURSE GLSL_SOURCE_FILES
+#   "${SHADER_DIR}/*.frag"
+#   "${SHADER_DIR}/*.vert"
+#   "${SHADER_DIR}/*.comp"
+# )
+
+# foreach(GLSL ${GLSL_SOURCE_FILES})
+#   message(STATUS "BUILDING SHADERS")
+#   get_filename_component(FILE_NAME ${GLSL} NAME)
+#   set(SPIRV "${SHADER_DIR}/${FILE_NAME}.spv")
+#   message(STATUS ${GLSL})
+#   add_custom_command(
+#     OUTPUT ${SPIRV}
+#     COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}
+#     DEPENDS ${GLSL})
+#   list(APPEND SPIRV_BINARY_FILES ${SPIRV})
+# endforeach(GLSL)
+
+# # Create custom target for building shaders
+# add_custom_target(
+#   Shaders 
+#   DEPENDS ${SPIRV_BINARY_FILES}
+# )
 
 # Custom target to build both the Engine and Shaders
-add_custom_target(BuildAll DEPENDS Engine Shaders)
+# add_custom_target(BuildAll DEPENDS Engine Shaders)

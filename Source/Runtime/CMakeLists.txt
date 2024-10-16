@@ -58,5 +58,6 @@ if (WIN32)
 	)
 endif()
 
-
+# Custom target to build both the Engine and Shaders
+# add_custom_target(BuildAll DEPENDS Engine Shaders)
 
