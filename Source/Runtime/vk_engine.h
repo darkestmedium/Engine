@@ -7,10 +7,15 @@
 #include <vector>
 #include <functional>
 #include <deque>
+#include <vk_mesh.h>
 
-class PipelineBuilder
-{
+#include <glm/glm.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/transform.hpp>
+
+class PipelineBuilder {
 public:
+
 	std::vector<VkPipelineShaderStageCreateInfo> _shaderStages;
 	VkPipelineVertexInputStateCreateInfo _vertexInputInfo;
 	VkPipelineInputAssemblyStateCreateInfo _inputAssembly;
@@ -20,7 +25,7 @@ public:
 	VkPipelineColorBlendAttachmentState _colorBlendAttachment;
 	VkPipelineMultisampleStateCreateInfo _multisampling;
 	VkPipelineLayout _pipelineLayout;
-
+	VkPipelineDepthStencilStateCreateInfo _depthStencil;
 	VkPipeline build_pipeline(VkDevice device, VkRenderPass pass);
 };
 
@@ -28,25 +33,26 @@ public:
 
 struct DeletionQueue
 {
-	std::deque<std::function<void()>> deletors;
+    std::deque<std::function<void()>> deletors;
 
-	void push_function(std::function<void()>&& function)
-	{
-		deletors.push_back(function);
-	}
+    void push_function(std::function<void()>&& function) {
+        deletors.push_back(function);
+    }
 
-	void flush()
-	{
-		// reverse iterate the deletion queue to execute all the functions
-		for (auto it = deletors.rbegin(); it != deletors.rend(); it++)
-		{
-			(*it)(); //call functors
-		}
+    void flush() {
+        // reverse iterate the deletion queue to execute all the functions
+        for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
+            (*it)(); //call functors
+        }
 
-		deletors.clear();
-	}
+        deletors.clear();
+    }
 };
 
+struct MeshPushConstants {
+	glm::vec4 data;
+	glm::mat4 render_matrix;
+};
 
 class VulkanEngine {
 public:
@@ -88,7 +94,22 @@ public:
 	VkPipeline _trianglePipeline;
 	VkPipeline _redTrianglePipeline;
 
-	DeletionQueue _mainDeletionQueue;
+    DeletionQueue _mainDeletionQueue;
+
+	VkPipeline _meshPipeline;
+	Mesh _triangleMesh;
+	Mesh _monkeyMesh;
+
+	VkPipelineLayout _meshPipelineLayout;
+
+	VmaAllocator _allocator; //vma lib allocator
+
+	//depth resources
+	VkImageView _depthImageView;
+	AllocatedImage _depthImage;
+
+	//the format for the depth image
+	VkFormat _depthFormat;
 
 	//initializes everything in the engine
 	void init();
@@ -96,10 +117,10 @@ public:
 	//shuts down the engine
 	void cleanup();
 
-	// Draw loop
+	//draw loop
 	void draw();
 
-	// Run main loop
+	//run main loop
 	void run();
 
 private:
@@ -120,4 +141,8 @@ private:
 
 	//loads a shader module from a spir-v file. Returns false if it errors
 	bool load_shader_module(const char* filePath, VkShaderModule* outShaderModule);
+
+	void load_meshes();
+
+	void upload_mesh(Mesh& mesh);
 };

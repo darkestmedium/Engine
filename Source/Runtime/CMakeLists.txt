@@ -14,6 +14,8 @@ add_executable(Engine
 	vk_engine.cpp
 	vk_engine.h
 	vk_types.h
+	vk_mesh.cpp
+	vk_mesh.h
 	vk_initializers.cpp
 	vk_initializers.h
 )
@@ -27,10 +29,10 @@ target_link_libraries(Engine PUBLIC
 	vma
 	vkbootstrap
 	glm
-	SDL3::SDL3
-	imgui
 	tinyobjloader
 	stb_image
+	SDL3::SDL3
+	imgui
 	fmt
 )
 

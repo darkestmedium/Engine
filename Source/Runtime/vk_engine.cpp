@@ -1,4 +1,5 @@
-﻿#include "vk_engine.h"
+﻿
+#include "vk_engine.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -11,11 +12,13 @@
 #include <iostream>
 #include <fstream>
 
+#define VMA_IMPLEMENTATION
+#include "vk_mem_alloc.h"
+
 
 constexpr bool bUseValidationLayers = true;
 
 
-// We want to immediately abort when there is an error. In normal engines this would give an error message to the user, or perform a dump of state.
 using namespace std;
 #define VK_CHECK(x)                                              \
 	do                                                             \
@@ -27,8 +30,6 @@ using namespace std;
 			abort();                                                   \
 		}                                                            \
 	} while (0)
-
-
 
 
 void VulkanEngine::init()
@@ -56,9 +57,11 @@ void VulkanEngine::init()
 	init_commands();
 
 	init_sync_structures();
-	
+
 	init_pipelines();
 
+	load_meshes();
+	
 	//everything went fine
 	_isInitialized = true;
 }
@@ -70,7 +73,7 @@ void VulkanEngine::cleanup()
 		vkDeviceWaitIdle(_device);
 
 		_mainDeletionQueue.flush();
-
+		
 		vkDestroySurfaceKHR(_instance, _surface, nullptr);
 
 		vkDestroyDevice(_device, nullptr);
@@ -111,26 +114,54 @@ void VulkanEngine::draw()
 	float flash = abs(sin(_frameNumber / 120.f));
 	clearValue.color = { { 0.0f, 0.0f, flash, 1.0f } };
 
+	//clear depth at 1
+	VkClearValue depthClear;
+	depthClear.depthStencil.depth = 1.f;
+
 	//start the main renderpass. 
 	//We will use the clear color from above, and the framebuffer of the index the swapchain gave us
 	VkRenderPassBeginInfo rpInfo = vkinit::renderpass_begin_info(_renderPass, _windowExtent, _framebuffers[swapchainImageIndex]);
 
 	//connect clear values
-	rpInfo.clearValueCount = 1;
-	rpInfo.pClearValues = &clearValue;
+	rpInfo.clearValueCount = 2;
+
+	VkClearValue clearValues[] = { clearValue, depthClear };
+
+	rpInfo.pClearValues = &clearValues[0];
 
 	vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	// once we start adding rendering commands, they will go here
-	if (_selectedShader == 0)
-	{
-		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
-	}
-	else
-	{
-		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _redTrianglePipeline);
-	}
-	vkCmdDraw(cmd, 3, 1, 0, 0);
+
+	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _meshPipeline);
+
+	//bind the mesh vertex buffer with offset 0
+	VkDeviceSize offset = 0;
+	vkCmdBindVertexBuffers(cmd, 0, 1, &_monkeyMesh._vertexBuffer._buffer, &offset);
+
+	//make a model view matrix for rendering the object
+	//camera position
+	glm::vec3 camPos = { 0.f,0.f,-2.f };
+
+	glm::mat4 view = glm::translate(glm::mat4(1.f), camPos);
+	//camera projection
+	glm::mat4 projection = glm::perspective(glm::radians(70.f), 1700.f / 900.f, 0.1f, 200.0f);
+	projection[1][1] *= -1;
+	//model rotation
+	glm::mat4 model = glm::rotate(glm::mat4{ 1.0f }, glm::radians(_frameNumber * 0.4f), glm::vec3(0, 1, 0));
+
+	//calculate final mesh matrix
+	glm::mat4 mesh_matrix = projection * view * model;
+
+	MeshPushConstants constants;
+	constants.render_matrix = mesh_matrix;
+
+	//upload the matrix to the gpu via pushconstants
+	vkCmdPushConstants(cmd, _meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
+
+	
+
+	//we can now draw the mesh
+	vkCmdDraw(cmd, _monkeyMesh._vertices.size(), 1, 0, 0);
 
 	//finalize the render pass
 	vkCmdEndRenderPass(cmd);
@@ -225,6 +256,7 @@ void VulkanEngine::init_vulkan()
 	//grab the instance 
 	_instance = vkb_inst.instance;
 	_debug_messenger = vkb_inst.debug_messenger;
+
 	SDL_Vulkan_CreateSurface(_window, _instance, nullptr, &_surface);
 
 	//use vkbootstrap to select a gpu. 
@@ -250,6 +282,17 @@ void VulkanEngine::init_vulkan()
 	_graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
 
 	_graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+
+	//initialize the memory allocator
+	VmaAllocatorCreateInfo allocatorInfo = {};
+	allocatorInfo.physicalDevice = _chosenGPU;
+	allocatorInfo.device = _device;
+	allocatorInfo.instance = _instance;
+	vmaCreateAllocator(&allocatorInfo, &_allocator);
+
+	_mainDeletionQueue.push_function([&]() {
+		vmaDestroyAllocator(_allocator);
+	});
 }
 
 void VulkanEngine::init_swapchain()
@@ -273,6 +316,38 @@ void VulkanEngine::init_swapchain()
 
 	_mainDeletionQueue.push_function([=]() {
 		vkDestroySwapchainKHR(_device, _swapchain, nullptr);
+	});
+
+	//depth image size will match the window
+	VkExtent3D depthImageExtent = {
+		_windowExtent.width,
+		_windowExtent.height,
+		1
+	};
+
+	//hardcoding the depth format to 32 bit float
+	_depthFormat = VK_FORMAT_D32_SFLOAT;
+
+	//the depth image will be a image with the format we selected and Depth Attachment usage flag
+	VkImageCreateInfo dimg_info = vkinit::image_create_info(_depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, depthImageExtent);
+
+	//for the depth image, we want to allocate it from gpu local memory
+	VmaAllocationCreateInfo dimg_allocinfo = {};
+	dimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+	dimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+	//allocate and create the image
+	vmaCreateImage(_allocator, &dimg_info, &dimg_allocinfo, &_depthImage._image, &_depthImage._allocation, nullptr);
+
+	//build a image-view for the depth image to use for rendering
+	VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(_depthFormat, _depthImage._image, VK_IMAGE_ASPECT_DEPTH_BIT);;
+
+	VK_CHECK(vkCreateImageView(_device, &dview_info, nullptr, &_depthImageView));
+
+	//add to deletion queues
+	_mainDeletionQueue.push_function([=]() {
+		vkDestroyImageView(_device, _depthImageView, nullptr);
+		vmaDestroyImage(_allocator, _depthImage._image, _depthImage._allocation);
 	});
 }
 
@@ -298,11 +373,29 @@ void VulkanEngine::init_default_renderpass()
 	color_attachment_ref.attachment = 0;
 	color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+	VkAttachmentDescription depth_attachment = {};
+	// Depth attachment
+	depth_attachment.flags = 0;
+	depth_attachment.format = _depthFormat;
+	depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference depth_attachment_ref = {};
+	depth_attachment_ref.attachment = 1;
+	depth_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
 	//we are going to create 1 subpass, which is the minimum you can do
 	VkSubpassDescription subpass = {};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &color_attachment_ref;
+	//hook the depth attachment into the subpass
+	subpass.pDepthStencilAttachment = &depth_attachment_ref;
 
 	//1 dependency, which is from "outside" into the subpass. And we can read or write color
 	VkSubpassDependency dependency = {};
@@ -313,16 +406,31 @@ void VulkanEngine::init_default_renderpass()
 	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
+	//dependency from outside to the subpass, making this subpass dependent on the previous renderpasses
+	VkSubpassDependency depth_dependency = {};
+	depth_dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	depth_dependency.dstSubpass = 0;
+	depth_dependency.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	depth_dependency.srcAccessMask = 0;
+	depth_dependency.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	depth_dependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+	//array of 2 dependencies, one for color, two for depth
+	VkSubpassDependency dependencies[2] = { dependency, depth_dependency };
+
+	//array of 2 attachments, one for the color, and other for depth
+	VkAttachmentDescription attachments[2] = { color_attachment,depth_attachment };
 
 	VkRenderPassCreateInfo render_pass_info = {};
 	render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	render_pass_info.attachmentCount = 1;
-	render_pass_info.pAttachments = &color_attachment;
+	//2 attachments from attachment array
+	render_pass_info.attachmentCount = 2;
+	render_pass_info.pAttachments = &attachments[0];
 	render_pass_info.subpassCount = 1;
 	render_pass_info.pSubpasses = &subpass;
-	render_pass_info.dependencyCount = 1;
-	render_pass_info.pDependencies = &dependency;
-
+	//2 dependencies from dependency array
+	render_pass_info.dependencyCount = 2;
+	render_pass_info.pDependencies = &dependencies[0];
 	
 	VK_CHECK(vkCreateRenderPass(_device, &render_pass_info, nullptr, &_renderPass));
 
@@ -341,7 +449,12 @@ void VulkanEngine::init_framebuffers()
 
 	for (int i = 0; i < swapchain_imagecount; i++) {
 
-		fb_info.pAttachments = &_swapchainImageViews[i];
+		VkImageView attachments[2];
+		attachments[0] = _swapchainImageViews[i];
+		attachments[1] = _depthImageView;
+
+		fb_info.pAttachments = attachments;
+		fb_info.attachmentCount = 2;
 		VK_CHECK(vkCreateFramebuffer(_device, &fb_info, nullptr, &_framebuffers[i]));
 
 		_mainDeletionQueue.push_function([=]() {
@@ -435,8 +548,8 @@ void VulkanEngine::init_pipelines()
 		std::cout << "Red Triangle vertex shader succesfully loaded" << std::endl;
 	}
 
-	// build the pipeline layout that controls the inputs/outputs of the shader
-	// we are not using descriptor sets or other systems yet, so no need to use anything other than empty default
+	//build the pipeline layout that controls the inputs/outputs of the shader
+	//we are not using descriptor sets or other systems yet, so no need to use anything other than empty default
 	VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
 
 	VK_CHECK(vkCreatePipelineLayout(_device, &pipeline_layout_info, nullptr, &_trianglePipelineLayout));
@@ -444,9 +557,11 @@ void VulkanEngine::init_pipelines()
 	//build the stage-create-info for both vertex and fragment stages. This lets the pipeline know the shader modules per stage
 	PipelineBuilder pipelineBuilder;
 
-	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, triangleVertexShader));
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, triangleVertexShader));
 
-	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
 
 
 	//vertex input controls how to read vertices from vertex buffers. We arent using it yet
@@ -479,6 +594,10 @@ void VulkanEngine::init_pipelines()
 	//use the triangle layout we created
 	pipelineBuilder._pipelineLayout = _trianglePipelineLayout;
 
+
+	//default depthtesting
+	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+
 	//finally build the pipeline
 	_trianglePipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
 
@@ -492,10 +611,71 @@ void VulkanEngine::init_pipelines()
 	pipelineBuilder._shaderStages.push_back(
 		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, redTriangleFragShader));
 
+
+
 	//build the red triangle pipeline
 	_redTrianglePipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
 
 
+	
+
+	//build the mesh pipeline
+
+	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
+
+	//connect the pipeline builder vertex input info to the one we get from Vertex
+	pipelineBuilder._vertexInputInfo.pVertexAttributeDescriptions = vertexDescription.attributes.data();
+	pipelineBuilder._vertexInputInfo.vertexAttributeDescriptionCount = vertexDescription.attributes.size();
+
+	pipelineBuilder._vertexInputInfo.pVertexBindingDescriptions = vertexDescription.bindings.data();
+	pipelineBuilder._vertexInputInfo.vertexBindingDescriptionCount = vertexDescription.bindings.size();
+
+	//clear the shader stages for the builder
+	pipelineBuilder._shaderStages.clear();
+
+	//compile mesh vertex shader
+
+
+	VkShaderModule meshVertShader;
+	if (!load_shader_module("./Shaders/tri_mesh_pushconstants.vert.spv", &meshVertShader))
+	{
+		std::cout << "Error when building the triangle vertex shader module" << std::endl;
+	}
+	else {
+		std::cout << "Red Triangle vertex shader succesfully loaded" << std::endl;
+	}
+
+	//add the other shaders
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader));
+
+	//make sure that triangleFragShader is holding the compiled colored_triangle.frag
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
+
+	//we start from just the default empty pipeline layout info
+	VkPipelineLayoutCreateInfo mesh_pipeline_layout_info = vkinit::pipeline_layout_create_info();
+
+	//setup push constants
+	VkPushConstantRange push_constant;
+	//offset 0
+	push_constant.offset = 0;
+	//size of a MeshPushConstant struct
+	push_constant.size = sizeof(MeshPushConstants);
+	//for the vertex shader
+	push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	mesh_pipeline_layout_info.pPushConstantRanges = &push_constant;
+	mesh_pipeline_layout_info.pushConstantRangeCount = 1;
+
+	VK_CHECK(vkCreatePipelineLayout(_device, &mesh_pipeline_layout_info, nullptr, &_meshPipelineLayout));
+
+	//hook the push constants layout
+	pipelineBuilder._pipelineLayout = _meshPipelineLayout;
+	//build the mesh triangle pipeline
+	_meshPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
+
+	vkDestroyShaderModule(_device, meshVertShader, nullptr);
 	vkDestroyShaderModule(_device, redTriangleVertShader, nullptr);
 	vkDestroyShaderModule(_device, redTriangleFragShader, nullptr);
 	vkDestroyShaderModule(_device, triangleFragShader, nullptr);
@@ -504,8 +684,10 @@ void VulkanEngine::init_pipelines()
 	_mainDeletionQueue.push_function([=]() {
 		vkDestroyPipeline(_device, _redTrianglePipeline, nullptr);
 		vkDestroyPipeline(_device, _trianglePipeline, nullptr);
+		vkDestroyPipeline(_device, _meshPipeline, nullptr);
 
 		vkDestroyPipelineLayout(_device, _trianglePipelineLayout, nullptr);
+		vkDestroyPipelineLayout(_device, _meshPipelineLayout, nullptr);
 	});
 }
 
@@ -590,6 +772,7 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
 	pipelineInfo.pRasterizationState = &_rasterizer;
 	pipelineInfo.pMultisampleState = &_multisampling;
 	pipelineInfo.pColorBlendState = &colorBlending;
+	pipelineInfo.pDepthStencilState = &_depthStencil;
 	pipelineInfo.layout = _pipelineLayout;
 	pipelineInfo.renderPass = pass;
 	pipelineInfo.subpass = 0;
@@ -606,4 +789,65 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
 	{
 		return newPipeline;
 	}
+}
+
+void VulkanEngine::load_meshes()
+{
+	//make the array 3 vertices long
+	_triangleMesh._vertices.resize(3);
+
+	//vertex positions
+	_triangleMesh._vertices[0].position = { 1.f,1.f, 0.0f };
+	_triangleMesh._vertices[1].position = { -1.f,1.f, 0.0f };
+	_triangleMesh._vertices[2].position = { 0.f,-1.f, 0.0f };
+
+	//vertex colors, all green
+	_triangleMesh._vertices[0].color = { 0.f,1.f, 0.0f }; //pure green
+	_triangleMesh._vertices[1].color = { 0.f,1.f, 0.0f }; //pure green
+	_triangleMesh._vertices[2].color = { 0.f,1.f, 0.0f }; //pure green
+	//we dont care about the vertex normals
+
+	//load the monkey
+	_monkeyMesh.load_from_obj("../../assets/monkey_smooth.obj");
+
+	upload_mesh(_triangleMesh);
+	upload_mesh(_monkeyMesh);
+}
+
+
+void VulkanEngine::upload_mesh(Mesh& mesh)
+{
+	//allocate vertex buffer
+	VkBufferCreateInfo bufferInfo = {};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.pNext = nullptr;
+	//this is the total size, in bytes, of the buffer we are allocating
+	bufferInfo.size = mesh._vertices.size() * sizeof(Vertex);
+	//this buffer is going to be used as a Vertex Buffer
+	bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+
+
+	//let the VMA library know that this data should be writeable by CPU, but also readable by GPU
+	VmaAllocationCreateInfo vmaallocInfo = {};
+	vmaallocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+	//allocate the buffer
+	VK_CHECK(vmaCreateBuffer(_allocator, &bufferInfo, &vmaallocInfo,
+		&mesh._vertexBuffer._buffer,
+		&mesh._vertexBuffer._allocation,
+		nullptr));
+
+	//add the destruction of triangle mesh buffer to the deletion queue
+	_mainDeletionQueue.push_function([=]() {
+
+		vmaDestroyBuffer(_allocator, mesh._vertexBuffer._buffer, mesh._vertexBuffer._allocation);
+		});
+
+	//copy vertex data
+	void* data;
+	vmaMapMemory(_allocator, mesh._vertexBuffer._allocation, &data);
+
+	memcpy(data, mesh._vertices.data(), mesh._vertices.size() * sizeof(Vertex));
+
+	vmaUnmapMemory(_allocator, mesh._vertexBuffer._allocation);
 }
