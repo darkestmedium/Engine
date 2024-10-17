@@ -194,7 +194,7 @@ void VulkanEngine::run()
 			}
 			else if (e.type == SDL_EVENT_KEY_DOWN)
 			{
-				if (e.key.type == SDLK_SPACE)
+				if (e.key.key == SDLK_SPACE)
 				{
 					_selectedShader += 1;
 					if (_selectedShader > 1)

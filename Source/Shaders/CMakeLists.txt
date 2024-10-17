@@ -1,6 +1,3 @@
-# Set target build directory for shaders
-# set(TARGET_BUILD_DIR "${PROJECT_SOURCE_DIR}/Build/${CMAKE_BUILD_TYPE}/Shaders")
-
 # Define the shader directory variable
 set(SHADER_SRC_DIR "${PROJECT_SOURCE_DIR}/Source/Shaders")
 

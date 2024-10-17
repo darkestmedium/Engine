@@ -1,7 +1,8 @@
+Source/Runtime/vk_engine_SDL3.cpp
+
 # Directories
 Binaries
 Build
-
 
 # Build files
 *.vcxproj
