@@ -16,6 +16,13 @@
 #include "vk_mem_alloc.h"
 
 
+// Clean up all the hardcoded pipelines and meshes from VulkanEngine class
+// Create multiple pipelines with newer shaders, and use them to render monkeys each with a different material each
+// Load more meshes. As long as it’s an obj with TRIANGLE meshes, it should work fine. Make sure on export that the obj includes normals and colors
+// Add WASD controls to the camera. For that, you would need to modify the camera matrices in the draw functions.
+// Sort the renderables array before rendering by Pipeline and Mesh, to reduce number of binds.
+
+
 constexpr bool bUseValidationLayers = true;
 
 
@@ -34,6 +41,9 @@ using namespace std;
 
 void VulkanEngine::init()
 {
+	_windowExtent = {args_.initialWidth, args_.initialHeight};
+
+
 	// We initialize SDL and create a window with it. 
 	SDL_Init(SDL_INIT_VIDEO);
 
@@ -245,7 +255,7 @@ void VulkanEngine::init_vulkan()
 	vkb::InstanceBuilder builder;
 
 	//make the vulkan instance, with basic debug features
-	auto inst_ret = builder.set_app_name("Example Vulkan Application")
+	auto inst_ret = builder.set_app_name(args_.programName.c_str())
 		.request_validation_layers(bUseValidationLayers)
 		.use_default_debug_messenger()
 		.require_api_version(1, 1, 0)

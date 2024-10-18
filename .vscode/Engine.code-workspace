@@ -148,6 +148,10 @@
 				"label": "Run Engine",
 				"type": "shell",
 				"command": "${workspaceFolder}/Binaries/${input:buildConfig}/Engine",
+				"args": 
+				[
+					"--verbose",
+				],
 				"windows": {"command": "${workspaceFolder}/Binaries/${input:buildConfig}/Engine"},
 				"options": {"cwd": "${workspaceFolder}/Binaries/${input:buildConfig}"},
 				"group": {"kind": "build"},

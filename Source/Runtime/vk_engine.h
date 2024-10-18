@@ -2,6 +2,7 @@
 // or project specific include files.
 
 #pragma once
+#include "ProgramConfig.h"
 
 #include <vk_types.h>
 #include <vector>
@@ -13,7 +14,9 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
 
-class PipelineBuilder {
+
+class PipelineBuilder
+{
 public:
 
 	std::vector<VkPipelineShaderStageCreateInfo> _shaderStages;
@@ -28,7 +31,6 @@ public:
 	VkPipelineDepthStencilStateCreateInfo _depthStencil;
 	VkPipeline build_pipeline(VkDevice device, VkRenderPass pass);
 };
-
 
 
 struct DeletionQueue
@@ -57,11 +59,17 @@ struct MeshPushConstants {
 class VulkanEngine {
 public:
 
+	VulkanEngine(ProgramConfig &args)
+		: args_(args)
+	{};
+		
+	ProgramConfig &args_;
+
 	bool _isInitialized{ false };
 	int _frameNumber {0};
 	int _selectedShader{ 0 };
 
-	VkExtent2D _windowExtent{ 1700 , 900 };
+	VkExtent2D _windowExtent;
 
 	struct SDL_Window* _window{ nullptr };
 

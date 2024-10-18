@@ -1,15 +1,11 @@
-#include <vk_engine.h>
+#include "vk_engine.h"
+#include "ProgramConfig.h"
 
 #include <iostream>
 #include <filesystem>
 
-#define FMT_HEADER_ONLY
-#include <fmt/core.h>
 
-
-
-
-int main(int argc, char* argv[])
+void GetPlatformStr(void)
 {
 	#if defined(__linux__)
 		fmt::println("Main: __linux__ is defined.");
@@ -20,16 +16,34 @@ int main(int argc, char* argv[])
 	#else
 		fmt::println("Main: Unknown platform.");
 	#endif
+}
 
-	fmt::println("Main: Current working directory: {}", std::filesystem::current_path().c_str());
 
-	VulkanEngine engine;
+int main(int argc, char* argv[])
+{
+	ProgramConfig args = argparse::parse<ProgramConfig>(argc, argv);
 
-	engine.init();	
+	if (args.help)
+	{
+		args.DisplayHelp();
+		return 0;
+	}
+
+	if (args.verbose)
+	{
+		args.print();  // Prints all variables
+		GetPlatformStr();
+		fmt::println("Main: Current working directory: {}", std::filesystem::current_path().c_str());
+	}
+
+	// Init Engine
+	VulkanEngine engine(args);
+
+	engine.init();
 	
-	engine.run();	
+	engine.run();
 
-	engine.cleanup();	
+	engine.cleanup();
 
 	return 0;
 }
