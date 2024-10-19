@@ -142,24 +142,18 @@ void VulkanEngine::draw()
 
 
 
-  // Camera
+  // CAMERA
 	// Model rotation
 	glm::mat4 model = glm::rotate(glm::mat4{ 1.0f }, glm::radians(_frameNumber * 0.4f), glm::vec3(0, 1, 0));
 
 	// Camera position
 	glm::vec3 camPos = { 0.0f, 0.f, -2.0f };
-	glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));;
+	glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 1.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	//camera projection
 
 	glm::mat4 projection = glm::perspective(glm::radians(70.0f), _windowExtent.width / (float) _windowExtent.height, 0.1f, 10.0f);
 	projection[1][1] *= -1;
-
-	// Calculate final mesh matrix
-	glm::mat4 mesh_matrix = projection * view * model;
-
-	MeshPushConstants constants;
-	constants.render_matrix = mesh_matrix;
 
 	ViewUniforms viewUniforms;
 	viewUniforms.view = view;
@@ -167,8 +161,11 @@ void VulkanEngine::draw()
 	viewUniforms.pos = camPos;
 
 
+
+
+
 	// Draw grid
-	//once we start adding rendering commands, they will go here
+	// once we start adding rendering commands, they will go here
 	if (_selectedShader == 0)
 	{
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
@@ -176,11 +173,11 @@ void VulkanEngine::draw()
 	else
 	{
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipeline);
-		vkCmdPushConstants(cmd, _meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
+		vkCmdPushConstants(cmd, mGridPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewUniforms), &viewUniforms);
 	}
 
-
 	vkCmdDraw(cmd, 6, 1, 0, 0);
+
 
 
 
@@ -192,8 +189,11 @@ void VulkanEngine::draw()
 	VkDeviceSize offset = 0;
 	vkCmdBindVertexBuffers(cmd, 0, 1, &_monkeyMesh._vertexBuffer._buffer, &offset);
 
+	// Calculate final mesh matrix
+	glm::mat4 mesh_matrix = projection * view * model;
 
-
+	MeshPushConstants constants;
+	constants.render_matrix = mesh_matrix;
 
 	//upload the matrix to the gpu via pushconstants
 	vkCmdPushConstants(cmd, _meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
@@ -569,25 +569,6 @@ void VulkanEngine::init_pipelines()
 		std::cout << "Triangle vertex shader succesfully loaded" << std::endl;
 	}
 
-	//compile colored triangle modules
-	VkShaderModule redTriangleFragShader;
-	if (!load_shader_module("./Shaders/triangle.frag.spv", &redTriangleFragShader))
-	{
-		std::cout << "Error when building the triangle fragment shader module" << std::endl;
-	}
-	else {
-		std::cout << "Red Triangle fragment shader succesfully loaded" << std::endl;
-	}
-
-	VkShaderModule redTriangleVertShader;
-	if (!load_shader_module("./Shaders/triangle.vert.spv", &redTriangleVertShader))
-	{
-		std::cout << "Error when building the triangle vertex shader module" << std::endl;
-	}
-	else {
-		std::cout << "Red Triangle vertex shader succesfully loaded" << std::endl;
-	}
-
 	//build the pipeline layout that controls the inputs/outputs of the shader
 	//we are not using descriptor sets or other systems yet, so no need to use anything other than empty default
 	VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
@@ -597,12 +578,8 @@ void VulkanEngine::init_pipelines()
 	//build the stage-create-info for both vertex and fragment stages. This lets the pipeline know the shader modules per stage
 	PipelineBuilder pipelineBuilder;
 
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, triangleVertexShader));
-
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
-
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, triangleVertexShader));
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
 
 	//vertex input controls how to read vertices from vertex buffers. We arent using it yet
 	pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info();
@@ -634,7 +611,6 @@ void VulkanEngine::init_pipelines()
 	//use the triangle layout we created
 	pipelineBuilder._pipelineLayout = _trianglePipelineLayout;
 
-
 	//default depthtesting
 	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
 
@@ -644,54 +620,93 @@ void VulkanEngine::init_pipelines()
 	//clear the shader stages for the builder
 	pipelineBuilder._shaderStages.clear();
 
-	//add the other shaders
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, redTriangleVertShader));
-
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, redTriangleFragShader));
 
 
 
-	//build the red triangle pipeline
+
+
+	// GRID PIPELINE
+	// Compile grid shader modules.
+	VkShaderModule gridFragShader;
+	if (!load_shader_module("./Shaders/Grid.frag.spv", &gridFragShader))
+	{
+		std::cout << "Error when building the grid fragment shader module" << std::endl;
+	}
+	else
+	{
+		std::cout << "Grid fragment shader succesfully loaded" << std::endl;
+	}
+
+	VkShaderModule gridVertShader;
+	if (!load_shader_module("./Shaders/Grid.vert.spv", &gridVertShader))
+	{
+		std::cout << "Error when building the grid vertex shader module" << std::endl;
+	}
+	else
+	{
+		std::cout << "Grid vertex shader succesfully loaded" << std::endl;
+	}
+
+
+	// Add the other shaders
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, gridVertShader));
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, gridFragShader));
+
+
+	//we start from just the default empty pipeline layout info
+	VkPipelineLayoutCreateInfo grid_pipeline_layout_info = vkinit::pipeline_layout_create_info();
+
+	//setup push constants
+	VkPushConstantRange view_constant;
+	view_constant.offset = 0;
+	//size of a MeshPushConstant struct
+	view_constant.size = sizeof(ViewUniforms);
+	//for the vertex shader
+	view_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	grid_pipeline_layout_info.pPushConstantRanges = &view_constant;
+	grid_pipeline_layout_info.pushConstantRangeCount = 1;
+
+	VK_CHECK(vkCreatePipelineLayout(_device, &grid_pipeline_layout_info, nullptr, &mGridPipelineLayout));
+
+	//hook the push constants layout
+	pipelineBuilder._pipelineLayout = mGridPipelineLayout;
+	//build the grid pipeline
 	mGridPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
 
-
+	pipelineBuilder._shaderStages.clear();
 	
 
-	//build the mesh pipeline
+
+
+
+
 
 	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
 
-	//connect the pipeline builder vertex input info to the one we get from Vertex
+	// Connect the pipeline builder vertex input info to the one we get from Vertex
 	pipelineBuilder._vertexInputInfo.pVertexAttributeDescriptions = vertexDescription.attributes.data();
 	pipelineBuilder._vertexInputInfo.vertexAttributeDescriptionCount = vertexDescription.attributes.size();
 
 	pipelineBuilder._vertexInputInfo.pVertexBindingDescriptions = vertexDescription.bindings.data();
 	pipelineBuilder._vertexInputInfo.vertexBindingDescriptionCount = vertexDescription.bindings.size();
 
-	//clear the shader stages for the builder
-	pipelineBuilder._shaderStages.clear();
-
-	//compile mesh vertex shader
 
 
+	// MESH PIPELINE
 	VkShaderModule meshVertShader;
 	if (!load_shader_module("./Shaders/tri_mesh_pushconstants.vert.spv", &meshVertShader))
 	{
-		std::cout << "Error when building the triangle vertex shader module" << std::endl;
+		std::cout << "Error when building the triangle vertex shader module." << std::endl;
 	}
 	else {
 		std::cout << "Red Triangle vertex shader succesfully loaded" << std::endl;
 	}
 
 	//add the other shaders
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader));
-
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader));
 	//make sure that triangleFragShader is holding the compiled colored_triangle.frag
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
 
 	//we start from just the default empty pipeline layout info
 	VkPipelineLayoutCreateInfo mesh_pipeline_layout_info = vkinit::pipeline_layout_create_info();
@@ -715,18 +730,24 @@ void VulkanEngine::init_pipelines()
 	//build the mesh triangle pipeline
 	_meshPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
 
+
+
+
+	// Cleanup!
 	vkDestroyShaderModule(_device, meshVertShader, nullptr);
-	vkDestroyShaderModule(_device, redTriangleVertShader, nullptr);
-	vkDestroyShaderModule(_device, redTriangleFragShader, nullptr);
+	vkDestroyShaderModule(_device, gridVertShader, nullptr);
+	vkDestroyShaderModule(_device, gridFragShader, nullptr);
 	vkDestroyShaderModule(_device, triangleFragShader, nullptr);
 	vkDestroyShaderModule(_device, triangleVertexShader, nullptr);
 
 	_mainDeletionQueue.push_function([=]() {
 		vkDestroyPipeline(_device, mGridPipeline, nullptr);
+		vkDestroyPipelineLayout(_device, mGridPipelineLayout, nullptr);
+	
 		vkDestroyPipeline(_device, _trianglePipeline, nullptr);
-		vkDestroyPipeline(_device, _meshPipeline, nullptr);
-
 		vkDestroyPipelineLayout(_device, _trianglePipelineLayout, nullptr);
+
+		vkDestroyPipeline(_device, _meshPipeline, nullptr);
 		vkDestroyPipelineLayout(_device, _meshPipelineLayout, nullptr);
 	});
 }

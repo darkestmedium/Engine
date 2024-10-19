@@ -101,8 +101,9 @@ public:
 	std::vector<VkImageView> _swapchainImageViews;
 
 	VkPipelineLayout _trianglePipelineLayout;
-
 	VkPipeline _trianglePipeline;
+
+	VkPipelineLayout mGridPipelineLayout;
 	VkPipeline mGridPipeline;
 
 	DeletionQueue _mainDeletionQueue;
