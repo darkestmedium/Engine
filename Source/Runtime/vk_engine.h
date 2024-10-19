@@ -57,6 +57,9 @@ struct ViewUniforms {
 	glm::mat4 view;
 	glm::mat4 proj;
 	glm::vec3 pos;
+
+	glm::vec3 nearPoint;
+	glm::vec3 farPoint;
 };
 
 class VulkanEngine {

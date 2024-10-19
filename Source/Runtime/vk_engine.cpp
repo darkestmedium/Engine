@@ -147,36 +147,30 @@ void VulkanEngine::draw()
 	glm::mat4 model = glm::rotate(glm::mat4{ 1.0f }, glm::radians(_frameNumber * 0.4f), glm::vec3(0, 1, 0));
 
 	// Camera position
+	float nearClip = 0.1f;
+	float farClip = 100.0f;
 	glm::vec3 camPos = { 0.0f, 0.f, -2.0f };
 	glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 1.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	//camera projection
 
-	glm::mat4 projection = glm::perspective(glm::radians(70.0f), _windowExtent.width / (float) _windowExtent.height, 0.1f, 10.0f);
+	glm::mat4 projection = glm::perspective(glm::radians(70.0f), _windowExtent.width / (float) _windowExtent.height, nearClip, farClip);
 	projection[1][1] *= -1;
 
 	ViewUniforms viewUniforms;
 	viewUniforms.view = view;
 	viewUniforms.proj = projection;
 	viewUniforms.pos = camPos;
+	// // Compute near and far points in view space or world space
+	// viewUniforms.nearPoint = glm::vec3(0.0f, 0.0f, nearClip); // near plane point
+	// viewUniforms.farPoint = glm::vec3(0.0f, 0.0f, farClip);  // far plane point
+	// Compute near and far points in world space
+	viewUniforms.nearPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -nearClip, 1.0f); // near plane point in world space
+	viewUniforms.farPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -farClip, 1.0f);  // far plane point in world space
 
 
 
 
-
-	// Draw grid
-	// once we start adding rendering commands, they will go here
-	if (_selectedShader == 0)
-	{
-		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
-	}
-	else
-	{
-		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipeline);
-		vkCmdPushConstants(cmd, mGridPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewUniforms), &viewUniforms);
-	}
-
-	vkCmdDraw(cmd, 6, 1, 0, 0);
 
 
 
@@ -200,6 +194,43 @@ void VulkanEngine::draw()
 
 	// we can now draw the mesh
 	vkCmdDraw(cmd, _monkeyMesh._vertices.size(), 1, 0, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+	// Draw grid
+	// once we start adding rendering commands, they will go here
+	if (_selectedShader == 0)
+	{
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
+	}
+	else
+	{
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipeline);
+		vkCmdPushConstants(cmd, mGridPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewUniforms), &viewUniforms);
+	}
+
+	vkCmdDraw(cmd, 6, 1, 0, 0);
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 	//finalize the render pass
