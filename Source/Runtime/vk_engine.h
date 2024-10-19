@@ -2,23 +2,18 @@
 // or project specific include files.
 
 #pragma once
+
 #include "ProgramConfig.h"
 
 #include <vk_types.h>
-#include <vector>
-#include <functional>
-#include <deque>
 #include <vk_mesh.h>
 
-#include <glm/glm.hpp>
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/transform.hpp>
+
 
 
 class PipelineBuilder
 {
 public:
-
 	std::vector<VkPipelineShaderStageCreateInfo> _shaderStages;
 	VkPipelineVertexInputStateCreateInfo _vertexInputInfo;
 	VkPipelineInputAssemblyStateCreateInfo _inputAssembly;
@@ -35,25 +30,33 @@ public:
 
 struct DeletionQueue
 {
-    std::deque<std::function<void()>> deletors;
+	std::deque<std::function<void()>> deletors;
 
-    void push_function(std::function<void()>&& function) {
-        deletors.push_back(function);
-    }
+	void push_function(std::function<void()>&& function)
+	{
+		deletors.push_back(function);
+	}
 
-    void flush() {
-        // reverse iterate the deletion queue to execute all the functions
-        for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
-            (*it)(); //call functors
-        }
+	void flush()
+	{
+		// reverse iterate the deletion queue to execute all the functions
+		for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
+				(*it)(); //call functors
+		}
 
-        deletors.clear();
-    }
+		deletors.clear();
+	}
 };
 
 struct MeshPushConstants {
 	glm::vec4 data;
 	glm::mat4 render_matrix;
+};
+
+struct ViewUniforms {
+	glm::mat4 view;
+	glm::mat4 proj;
+	glm::vec3 pos;
 };
 
 class VulkanEngine {
@@ -71,7 +74,7 @@ public:
 
 	VkExtent2D _windowExtent;
 
-	struct SDL_Window* _window{ nullptr };
+	struct SDL_Window *_window{ nullptr };
 
 	VkInstance _instance;
 	VkDebugUtilsMessengerEXT _debug_messenger;
@@ -100,9 +103,9 @@ public:
 	VkPipelineLayout _trianglePipelineLayout;
 
 	VkPipeline _trianglePipeline;
-	VkPipeline _redTrianglePipeline;
+	VkPipeline mGridPipeline;
 
-    DeletionQueue _mainDeletionQueue;
+	DeletionQueue _mainDeletionQueue;
 
 	VkPipeline _meshPipeline;
 	Mesh _triangleMesh;
@@ -147,7 +150,7 @@ private:
 
 	void init_pipelines();
 
-	//loads a shader module from a spir-v file. Returns false if it errors
+	// loads a shader module from a spir-v file. Returns false if it errors
 	bool load_shader_module(const char* filePath, VkShaderModule* outShaderModule);
 
 	void load_meshes();

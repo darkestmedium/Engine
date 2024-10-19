@@ -9,8 +9,6 @@
 
 #include "VkBootstrap.h"
 
-#include <iostream>
-#include <fstream>
 
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
@@ -142,39 +140,71 @@ void VulkanEngine::draw()
 	vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 
+
+
+  // Camera
+	// Model rotation
+	glm::mat4 model = glm::rotate(glm::mat4{ 1.0f }, glm::radians(_frameNumber * 0.4f), glm::vec3(0, 1, 0));
+
+	// Camera position
+	glm::vec3 camPos = { 0.0f, 0.f, -2.0f };
+	glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));;
+
+	//camera projection
+
+	glm::mat4 projection = glm::perspective(glm::radians(70.0f), _windowExtent.width / (float) _windowExtent.height, 0.1f, 10.0f);
+	projection[1][1] *= -1;
+
+	// Calculate final mesh matrix
+	glm::mat4 mesh_matrix = projection * view * model;
+
+	MeshPushConstants constants;
+	constants.render_matrix = mesh_matrix;
+
+	ViewUniforms viewUniforms;
+	viewUniforms.view = view;
+	viewUniforms.proj = projection;
+	viewUniforms.pos = camPos;
+
+
+	// Draw grid
+	//once we start adding rendering commands, they will go here
+	if (_selectedShader == 0)
+	{
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
+	}
+	else
+	{
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipeline);
+		vkCmdPushConstants(cmd, _meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
+	}
+
+
+	vkCmdDraw(cmd, 6, 1, 0, 0);
+
+
+
+
+	// Render Monkey head
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _meshPipeline);
 
 	//bind the mesh vertex buffer with offset 0
 	VkDeviceSize offset = 0;
 	vkCmdBindVertexBuffers(cmd, 0, 1, &_monkeyMesh._vertexBuffer._buffer, &offset);
 
-	//make a model view matrix for rendering the object
-	//camera position
-	glm::vec3 camPos = { 0.f,0.f,-2.f };
 
-	glm::mat4 view = glm::translate(glm::mat4(1.f), camPos);
-	//camera projection
-	glm::mat4 projection = glm::perspective(glm::radians(70.f), 1700.f / 900.f, 0.1f, 200.0f);
-	projection[1][1] *= -1;
-	//model rotation
-	glm::mat4 model = glm::rotate(glm::mat4{ 1.0f }, glm::radians(_frameNumber * 0.4f), glm::vec3(0, 1, 0));
 
-	//calculate final mesh matrix
-	glm::mat4 mesh_matrix = projection * view * model;
-
-	MeshPushConstants constants;
-	constants.render_matrix = mesh_matrix;
 
 	//upload the matrix to the gpu via pushconstants
 	vkCmdPushConstants(cmd, _meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
 
-	
-
-	//we can now draw the mesh
+	// we can now draw the mesh
 	vkCmdDraw(cmd, _monkeyMesh._vertices.size(), 1, 0, 0);
+
 
 	//finalize the render pass
 	vkCmdEndRenderPass(cmd);
+
 	//finalize the command buffer (we can no longer add commands, but it can now be executed)
 	VK_CHECK(vkEndCommandBuffer(cmd));
 
@@ -624,7 +654,7 @@ void VulkanEngine::init_pipelines()
 
 
 	//build the red triangle pipeline
-	_redTrianglePipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
+	mGridPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
 
 
 	
@@ -692,7 +722,7 @@ void VulkanEngine::init_pipelines()
 	vkDestroyShaderModule(_device, triangleVertexShader, nullptr);
 
 	_mainDeletionQueue.push_function([=]() {
-		vkDestroyPipeline(_device, _redTrianglePipeline, nullptr);
+		vkDestroyPipeline(_device, mGridPipeline, nullptr);
 		vkDestroyPipeline(_device, _trianglePipeline, nullptr);
 		vkDestroyPipeline(_device, _meshPipeline, nullptr);
 
@@ -700,6 +730,7 @@ void VulkanEngine::init_pipelines()
 		vkDestroyPipelineLayout(_device, _meshPipelineLayout, nullptr);
 	});
 }
+
 
 bool VulkanEngine::load_shader_module(const char* filePath, VkShaderModule* outShaderModule)
 {
@@ -743,6 +774,7 @@ bool VulkanEngine::load_shader_module(const char* filePath, VkShaderModule* outS
 	*outShaderModule = shaderModule;
 	return true;
 }
+
 
 VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
 {
@@ -800,6 +832,7 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
 		return newPipeline;
 	}
 }
+
 
 void VulkanEngine::load_meshes()
 {

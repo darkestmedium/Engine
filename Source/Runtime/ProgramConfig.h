@@ -40,14 +40,13 @@ struct ProgramConfig : public argparse::Args
 		};
 	}
 
-	std::string &programName   = kwarg("pn,programName", "Name of the program, will be displayed in window.").set_default("Vulkan Engine");
-
-	uint32_t &initialWidth  = kwarg("iw,initialWidth", "Initial width of the window.").set_default(1920);
-	uint32_t &initialHeight = kwarg("ih,initialHeight", "Initial height of the window.").set_default(810);
+	std::string &programName = kwarg("pn,programName", "Name of the program, will be displayed in window.").set_default("Vulkan Engine");
+	uint32_t &initialWidth   = kwarg("iw,initialWidth", "Initial width of the window.").set_default(1920);
+	uint32_t &initialHeight  = kwarg("ih,initialHeight", "Initial height of the window.").set_default(810);
 
 	// uint16_t &msaaSamples       = kwarg("msaa,msaaSamples", "Multisample anti-aliasing.").set_default(8);
-	uint16_t &presentMode       = kwarg("pm,presentMode", "Present mode, default is VK_PRESENT_MODE_FIFO_KHR.").set_default(2);
-	uint16_t &maxFramesInFlight = kwarg("fif,framesInFlight", "Amount of frames in flight, default is 2.").set_default(2);
+	uint16_t &presentMode    = kwarg("pm,presentMode", "Present mode, default is VK_PRESENT_MODE_FIFO_KHR.").set_default(2);
+	uint16_t &framesInFlight = kwarg("fif,framesInFlight", "Amount of frames in flight, default is 2.").set_default(2);
 
 	bool &verbose = flag("v,verbose", "Toggle verbose mode.");
 	bool &help    = flag("h,help", "Display usage");
@@ -60,7 +59,8 @@ struct ProgramConfig : public argparse::Args
 	// std::vector<const char*> requiredDeviceFeautres;
 	std::vector<int>         requiredDeviceQueueFlags;
 
-	void DisplayHelp() {
+	void DisplayHelp()
+	{
 		fmt::print(
 			"Flags:\n"
 			"  --pn  --programName (string):  Name of the program, will be displayed in window.\n"

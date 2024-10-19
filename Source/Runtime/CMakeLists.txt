@@ -19,10 +19,11 @@ add_executable(Engine
 	vk_mesh.cpp
 	vk_mesh.h
 	vk_types.h
+	Camera.h
+	Transform.h
 )
 
 # set_property(TARGET Engine PROPERTY CXX_STANDARD 17)
-target_compile_definitions(Engine PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 target_include_directories(Engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
 target_link_libraries(Engine PUBLIC
