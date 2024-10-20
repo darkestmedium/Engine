@@ -197,15 +197,18 @@ void VulkanEngine::draw()
 	// once we start adding rendering commands, they will go here
 	if (_selectedShader == 0)
 	{
-		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
-	}
-	else
-	{
+		// vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipeline);
 		vkCmdPushConstants(cmd, mGridPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewUniforms), &mViewUniforms);
+		vkCmdDraw(cmd, 6, 1, 0, 0);
 	}
+	// else
+	// {
+	// 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipeline);
+	// 	vkCmdPushConstants(cmd, mGridPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewUniforms), &mViewUniforms);
+	// 	vkCmdDraw(cmd, 6, 1, 0, 0);
+	// }
 
-	vkCmdDraw(cmd, 6, 1, 0, 0);
 
 
 
@@ -273,7 +276,7 @@ void VulkanEngine::run()
 			}
 			else if (e.type == SDL_EVENT_KEY_DOWN)
 			{
-				if (e.key.key == SDLK_SPACE)
+				if (e.key.key == SDLK_G)
 				{
 					_selectedShader += 1;
 					if (_selectedShader > 1)

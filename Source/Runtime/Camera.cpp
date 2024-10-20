@@ -13,7 +13,6 @@ glm::mat4 Camera::GetViewMatrix() const
 	return glm::inverse(cameraTranslation * cameraRotation);
 }
 
-
 glm::mat4 Camera::GetRotationMatrix() const
 {
 	// fairly typical FPS style camera. we join the pitch and yaw rotations into
@@ -24,7 +23,6 @@ glm::mat4 Camera::GetRotationMatrix() const
 
 	return glm::toMat4(yawRotation) * glm::toMat4(pitchRotation);
 }
-
 
 glm::vec3 Camera::GetPosition() const
 {
@@ -50,6 +48,7 @@ float Camera::GetNearClip() const
 {
 	return mNearClip;
 }
+
 float Camera::GetFarClip() const
 {
 	return mFarClip;
@@ -58,9 +57,6 @@ float Camera::GetFarClip() const
 
 void Camera::ProcessSDLEvent(SDL_Event& event)
 {
-	static bool isLMBPressed = false;
-	static bool isRMBPressed = false;
-
 	if (event.type == SDL_EVENT_KEY_DOWN)
 	{
 		if (event.key.key == SDLK_W) {mVelocity.z = -1;}
@@ -77,79 +73,49 @@ void Camera::ProcessSDLEvent(SDL_Event& event)
 		if (event.key.key == SDLK_D) {mVelocity.x = 0;}
 	}
 
-	// Check for LMB press and release
-	if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT)
+
+	static bool bIsLMBPressed = false;
+	static bool bIsRMBPressed = false;
+
+
+	if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
 	{
-		isLMBPressed = true;
+		if (event.button.button == SDL_BUTTON_LEFT)	{bIsLMBPressed = true;}
+		if (event.button.button == SDL_BUTTON_RIGHT) {bIsRMBPressed = true;}
 	}
-
-	if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT)
+	if (event.type == SDL_EVENT_MOUSE_BUTTON_UP)
 	{
-		isLMBPressed = false;
-		// velocity.x = 0;
-		// velocity.y = 0;
-		// velocity.z = 0;
-	}
+		if (event.button.button == SDL_BUTTON_LEFT)	{bIsLMBPressed = false;}
+		if (event.button.button == SDL_BUTTON_RIGHT) {bIsRMBPressed = false;}
 
-	// Check for RMB press and release
-	if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT)
-	{
-		isRMBPressed = true;
-	}
-
-	if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_RIGHT)
-	{
-		isRMBPressed = false;
-		// velocity.x = 0;
-		// velocity.y = 0;
-		// velocity.z = 0;
-	}
-
-	// if (event.type == SDL_EVENT_MOUSE_MOTION && isLMBPressed && !isRMBPressed)
-	// {
-	// 	yaw += (float)event.motion.xrel / 250.f;
-	// }
-
-	if (event.type == SDL_EVENT_MOUSE_MOTION && isRMBPressed && !isLMBPressed)
-	{
-		mYaw += (float)event.motion.xrel / 250.f;
-		mPitch -= (float)event.motion.yrel / 250.f;
+		mVelocity.x = 0.0f;
+		mVelocity.y = 0.0f;
+		mVelocity.z = 0.0f;
 	}
 
 
-	if (event.type == SDL_EVENT_MOUSE_MOTION && isLMBPressed && isRMBPressed)
+	if (event.type == SDL_EVENT_MOUSE_MOTION)
 	{
-		mVelocity.x = (float)event.motion.xrel / 25.f;
-		mVelocity.y = -(float)event.motion.yrel / 25.f;
-	// 	if (event.motion.xrel != 0)
-	// 	{
-	// 		velocity.x = (float)event.motion.xrel / 25.f;
-	// 	}
-	// 	else
-	// 	{
-	// 		velocity.x = 0;
-	// 		velocity.y = 0;
-	// 		velocity.z = 0;
-	// 	}
+		// Look Around
+		if (bIsRMBPressed)
+		{
+			mYaw += (float)event.motion.xrel / 250.f;
+			mPitch -= (float)event.motion.yrel / 250.f;
+		}
 
-	// 	if (event.motion.yrel != 0)
-	// 	{
-	// 		velocity.y = -(float)event.motion.yrel / 25.f;
-	// 	}
-	// 	else
-	// 	{
-	// 		velocity.x = 0;
-	// 		velocity.y = 0;
-	// 		velocity.z = 0;
-
-	// 	}
+		// Pan
+		if (bIsLMBPressed && bIsRMBPressed)
+		{
+			mVelocity.x = (float)event.motion.xrel / 25.f;
+			mVelocity.y = -(float)event.motion.yrel / 25.f;
+		}
 	}
-
 }
 
 
 void Camera::Update()
 {
 	glm::mat4 cameraRotation = GetRotationMatrix();
-	mPosition += glm::vec3(cameraRotation * glm::vec4(mVelocity * 0.5f, 0.f));
+	// mPosition += glm::vec3(cameraRotation * glm::vec4(mVelocity * 0.5f, 0.f));
+	mPosition += glm::vec3(cameraRotation * glm::vec4(mVelocity, 0.0f));
 }
