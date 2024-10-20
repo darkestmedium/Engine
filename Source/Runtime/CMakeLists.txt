@@ -27,7 +27,8 @@ add_executable(Engine
 target_include_directories(Engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
 target_link_libraries(Engine PUBLIC
-	Vulkan::Vulkan
+	# vulkan
+	volk
 	vma
 	vkbootstrap
 	glm
@@ -50,7 +51,8 @@ target_precompile_headers(Engine PUBLIC
 	<unordered_map>
 	<glm/mat4x4.hpp>
 	<glm/vec4.hpp>
-	<vulkan/vulkan.h>
+	# <vulkan/vulkan.h>
+	<volk/volk.h>
 )
 
 

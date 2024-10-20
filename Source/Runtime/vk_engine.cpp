@@ -1,17 +1,25 @@
-﻿
+﻿// // Vulkan
+// #define VOLK_IMPLEMENTATION
+// #define VMA_IMPLEMENTATION
+// #define VMA_STATIC_VULKAN_FUNCTIONS 0
+// #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
+
+
+
+
 #include "vk_engine.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 
-#include <vk_types.h>
-#include <vk_initializers.h>
+// #include <vk_types.h>
+// #include <vk_initializers.h>
 
 #include "VkBootstrap.h"
 
 
-#define VMA_IMPLEMENTATION
-#include "vk_mem_alloc.h"
+// #define VMA_IMPLEMENTATION
+// #include "vk_mem_alloc.h"
 
 
 // Clean up all the hardcoded pipelines and meshes from VulkanEngine class
@@ -19,6 +27,10 @@
 // Load more meshes. As long as it’s an obj with TRIANGLE meshes, it should work fine. Make sure on export that the obj includes normals and colors
 // Add WASD controls to the camera. For that, you would need to modify the camera matrices in the draw functions.
 // Sort the renderables array before rendering by Pipeline and Mesh, to reduce number of binds.
+
+
+#define DEBUG
+
 
 
 constexpr bool bUseValidationLayers = true;
@@ -35,6 +47,19 @@ using namespace std;
 			abort();                                                   \
 		}                                                            \
 	} while (0)
+
+
+
+const char *VulkanEngine::getName() 
+{
+	return "VulkanEngine";
+}
+
+
+
+
+
+
 
 
 void VulkanEngine::init()
@@ -314,6 +339,19 @@ void VulkanEngine::run()
 
 void VulkanEngine::init_vulkan()
 {
+	// Load Volk
+	if (volkInitialize() != VK_SUCCESS)
+	{
+		#ifdef DEBUG
+    fmt::println("{}: WARNING! Volk failed to load.", getName());
+		#endif
+    return;
+  }
+	#ifdef DEBUG
+  fmt::println("{}: Volk loaded successfully.", getName());
+	#endif
+
+
 	vkb::InstanceBuilder builder;
 
 	//make the vulkan instance, with basic debug features
@@ -327,6 +365,10 @@ void VulkanEngine::init_vulkan()
 
 	//grab the instance 
 	_instance = vkb_inst.instance;
+
+	// Load instance level vulkan functions
+  volkLoadInstance(_instance);
+
 	_debug_messenger = vkb_inst.debug_messenger;
 
 	SDL_Vulkan_CreateSurface(_window, _instance, nullptr, &_surface);
@@ -346,26 +388,57 @@ void VulkanEngine::init_vulkan()
 
 	vkb::Device vkbDevice = deviceBuilder.build().value();
 
+	fmt::println("{}: Logical device created successfully.", getName());
+
 	// Get the VkDevice handle used in the rest of a vulkan application
 	_device = vkbDevice.device;
+
+	// Load device-specific Vulkan functions queueFamilyIndecies_
+  volkLoadDevice(_device);
+
 	_chosenGPU = physicalDevice.physical_device;
 
 	// use vkbootstrap to get a Graphics queue
 	_graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
-
 	_graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 
-	//initialize the memory allocator
-	VmaAllocatorCreateInfo allocatorInfo = {};
-	allocatorInfo.physicalDevice = _chosenGPU;
-	allocatorInfo.device = _device;
-	allocatorInfo.instance = _instance;
-	vmaCreateAllocator(&allocatorInfo, &_allocator);
+	// //initialize the memory allocator
+	// VmaAllocatorCreateInfo allocatorInfo = {};
+	// allocatorInfo.physicalDevice = _chosenGPU;
+	// allocatorInfo.device = _device;
+	// allocatorInfo.instance = _instance;
+	// vmaCreateAllocator(&allocatorInfo, &_allocator);
+  VmaVulkanFunctions vulkanFunctions
+	{
+    .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
+    .vkGetDeviceProcAddr = vkGetDeviceProcAddr,
+  };
+
+  VmaAllocatorCreateInfo allocatorInfo
+	{
+    .physicalDevice = _chosenGPU,
+    .device = _device,
+    .pVulkanFunctions = &vulkanFunctions,
+    .instance = _instance,
+  };
+
+  if (vmaCreateAllocator(&allocatorInfo, &_allocator) != VK_SUCCESS)
+	{
+    fmt::println("{}: ERROR! Failed to create vulkan memory allocator.", getName());
+    return;
+  };
+
+  fmt::println("{}: Vulkan Memory Allocator created successfully.", getName());
+
+
+
+
 
 	_mainDeletionQueue.push_function([&]() {
 		vmaDestroyAllocator(_allocator);
 	});
 }
+
 
 void VulkanEngine::init_swapchain()
 {
@@ -580,7 +653,7 @@ void VulkanEngine::init_sync_structures()
 		});
 }
 
-
+ 
 void VulkanEngine::init_pipelines()
 {
 	VkShaderModule triangleFragShader;

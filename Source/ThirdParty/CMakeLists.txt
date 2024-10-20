@@ -1,4 +1,20 @@
-find_package(Vulkan REQUIRED)
+# find_package(Vulkan REQUIRED)
+
+# add_library(vulkan INTERFACE)
+# target_include_directories(vulkan INTERFACE vulkan)
+
+
+
+# Add Volk as an INTERFACE library
+add_library(volk INTERFACE)
+target_include_directories(volk INTERFACE vulkan)
+
+# # If you have Vulkan SDK installed and still want to link Vulkan for certain use cases
+# # You can still specify the Vulkan library manually, if needed:
+# target_link_libraries(volk INTERFACE vulkan)
+
+
+
 
 
 add_library(argparse INTERFACE)
@@ -33,7 +49,7 @@ target_sources(vkbootstrap PRIVATE
   vulkan/vkbootstrap/VkBootstrap.cpp
 )
 target_include_directories(vkbootstrap PUBLIC vulkan/vkbootstrap)
-target_link_libraries(vkbootstrap PUBLIC Vulkan::Vulkan $<$<BOOL:UNIX>:${CMAKE_DL_LIBS}>)
+target_link_libraries(vkbootstrap PUBLIC vulkan $<$<BOOL:UNIX>:${CMAKE_DL_LIBS}>)
 set_property(TARGET vkbootstrap PROPERTY CXX_STANDARD 20)
 
 
@@ -74,5 +90,5 @@ target_sources(imgui PRIVATE
   imgui/imgui_impl_vulkan.cpp
   imgui/imgui_impl_sdl3.cpp
 )
-target_link_libraries(imgui PUBLIC Vulkan::Vulkan SDL3::SDL3)
+target_link_libraries(imgui PUBLIC vulkan SDL3::SDL3)
 target_include_directories(stb_image INTERFACE stb_image)

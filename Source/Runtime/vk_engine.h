@@ -6,6 +6,7 @@
 #include "ProgramConfig.h"
 
 #include <vk_types.h>
+#include <vk_initializers.h>
 #include <vk_mesh.h>
 
 
@@ -48,10 +49,12 @@ struct DeletionQueue
 	}
 };
 
+
 struct MeshPushConstants {
 	glm::vec4 data;
 	glm::mat4 render_matrix;
 };
+
 
 struct ViewUniforms {
 	glm::mat4 view;
@@ -61,6 +64,17 @@ struct ViewUniforms {
 	glm::vec3 nearPoint;
 	glm::vec3 farPoint;
 };
+
+
+struct FrameData {
+	VkSemaphore _presentSemaphore, _renderSemaphore;
+	VkFence _renderFence;	
+
+	VkCommandPool _commandPool;
+	VkCommandBuffer _mainCommandBuffer;
+};
+
+
 
 class VulkanEngine {
 public:
@@ -125,6 +139,8 @@ public:
 
 	//the format for the depth image
 	VkFormat _depthFormat;
+
+	const char *getName();
 
 	//initializes everything in the engine
 	void init();
