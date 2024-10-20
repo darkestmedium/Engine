@@ -57,6 +57,10 @@ float Camera::GetFarClip() const
 
 void Camera::ProcessSDLEvent(SDL_Event& event)
 {
+	static bool bIsLMBPressed = false;
+	static bool bIsRMBPressed = false;
+
+	// Keyboard
 	if (event.type == SDL_EVENT_KEY_DOWN)
 	{
 		if (event.key.key == SDLK_W) {mVelocity.z = -1;}
@@ -73,11 +77,6 @@ void Camera::ProcessSDLEvent(SDL_Event& event)
 		if (event.key.key == SDLK_D) {mVelocity.x = 0;}
 	}
 
-
-	static bool bIsLMBPressed = false;
-	static bool bIsRMBPressed = false;
-
-
 	if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
 	{
 		if (event.button.button == SDL_BUTTON_LEFT)	{bIsLMBPressed = true;}
@@ -87,7 +86,6 @@ void Camera::ProcessSDLEvent(SDL_Event& event)
 	{
 		if (event.button.button == SDL_BUTTON_LEFT)	{bIsLMBPressed = false;}
 		if (event.button.button == SDL_BUTTON_RIGHT) {bIsRMBPressed = false;}
-
 		mVelocity.x = 0.0f;
 		mVelocity.y = 0.0f;
 		mVelocity.z = 0.0f;
@@ -110,6 +108,7 @@ void Camera::ProcessSDLEvent(SDL_Event& event)
 			mVelocity.y = -(float)event.motion.yrel / 25.f;
 		}
 	}
+
 }
 
 

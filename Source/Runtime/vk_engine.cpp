@@ -32,11 +32,15 @@
 #define DEBUG
 
 
-
-constexpr bool bUseValidationLayers = true;
+#ifdef DEBUG
+	constexpr bool bUseValidationLayers = true;
+#else
+	constexpr bool bUseValidationLayers = false;
+#endif
 
 
 using namespace std;
+
 #define VK_CHECK(x)                                              \
 	do                                                             \
 	{                                                              \
@@ -54,10 +58,6 @@ const char *VulkanEngine::GetName()
 {
 	return "VulkanEngine";
 }
-
-
-
-
 
 
 
@@ -107,6 +107,7 @@ void VulkanEngine::Deinitialize()
 		vkDeviceWaitIdle(_device);
 
 		_mainDeletionQueue.flush();
+		fmt::println("{}: Deletion queue was flushed.", GetName());
 	
 	  vmaDestroyAllocator(_allocator);
 		fmt::println("{}: Vulkan Memory Allocator was destroyed.", GetName());
@@ -123,6 +124,7 @@ void VulkanEngine::Deinitialize()
 		fmt::println("{}: Vulkan Instance was destroyed.", GetName());
 
 		SDL_DestroyWindow(_window);
+		fmt::println("{}: SDL Windows was destroyed.", GetName());
 	}
 }
 

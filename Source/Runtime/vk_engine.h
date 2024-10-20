@@ -77,6 +77,7 @@ struct FrameData {
 	VkCommandBuffer _mainCommandBuffer;
 };
 
+
 constexpr unsigned int FRAME_OVERLAP = 2;
 
 class VulkanEngine
@@ -86,6 +87,7 @@ public:
 	// Constructors
 	VulkanEngine(ProgramConfig &args)
 		: mArgs(args)
+		, bIsInitialized(false)
 	{};
 
 	// Destructors
@@ -93,7 +95,7 @@ public:
 		
 	ProgramConfig &mArgs;
 
-	bool bIsInitialized{ false };
+	bool bIsInitialized;
 	int _frameNumber{ 0 };
 	int _selectedShader{ 0 };
 
