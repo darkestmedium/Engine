@@ -149,8 +149,9 @@ void VulkanEngine::draw()
 	// Camera position
 	float nearClip = 0.1f;
 	float farClip = 100.0f;
+
 	glm::vec3 camPos = { 0.0f, 0.f, -2.0f };
-	glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 1.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::mat4 view = glm::lookAt(camPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	//camera projection
 
@@ -162,11 +163,11 @@ void VulkanEngine::draw()
 	viewUniforms.proj = projection;
 	viewUniforms.pos = camPos;
 	// // Compute near and far points in view space or world space
-	// viewUniforms.nearPoint = glm::vec3(0.0f, 0.0f, nearClip); // near plane point
-	// viewUniforms.farPoint = glm::vec3(0.0f, 0.0f, farClip);  // far plane point
+	viewUniforms.nearPoint = glm::vec3(0.0f, 0.0f, nearClip); // near plane point
+	viewUniforms.farPoint = glm::vec3(0.0f, 0.0f, farClip);  // far plane point
 	// Compute near and far points in world space
-	viewUniforms.nearPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -nearClip, 1.0f); // near plane point in world space
-	viewUniforms.farPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -farClip, 1.0f);  // far plane point in world space
+	// viewUniforms.nearPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -nearClip, 1.0f); // near plane point in world space
+	// viewUniforms.farPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -farClip, 1.0f);  // far plane point in world space
 
 
 

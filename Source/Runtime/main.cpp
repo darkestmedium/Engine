@@ -37,6 +37,7 @@ int main(int argc, char* argv[])
 
 	if (args.verbose)
 	{
+		#define DEBUG
 		args.print();  // Prints all variables
 		GetPlatformStr();
 		fmt::println("Main: Current working directory: {}", std::filesystem::current_path().c_str());
