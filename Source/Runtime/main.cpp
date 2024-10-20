@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
 	
 	engine.run();
 
-	engine.cleanup();
+	// engine.Deinitialize();
 
 	return 0;
 }

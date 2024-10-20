@@ -50,7 +50,7 @@ using namespace std;
 
 
 
-const char *VulkanEngine::getName() 
+const char *VulkanEngine::GetName() 
 {
 	return "VulkanEngine";
 }
@@ -64,8 +64,7 @@ const char *VulkanEngine::getName()
 
 void VulkanEngine::init()
 {
-	_windowExtent = {args_.initialWidth, args_.initialHeight};
-
+	_windowExtent = {mArgs.initialWidth, mArgs.initialHeight};
 
 	// We initialize SDL and create a window with it. 
 	SDL_Init(SDL_INIT_VIDEO);
@@ -97,46 +96,58 @@ void VulkanEngine::init()
 
 	mMainCamera = Camera({0.0f, 0.0f, 2.0f});
 	
-	_isInitialized = true;
+	bIsInitialized = true;
 }
-void VulkanEngine::cleanup()
+
+
+void VulkanEngine::Deinitialize()
 {	
-	if (_isInitialized) {
-		
-		//make sure the gpu has stopped doing its things
+	if (bIsInitialized)
+	{
 		vkDeviceWaitIdle(_device);
 
 		_mainDeletionQueue.flush();
-		
-		vkDestroySurfaceKHR(_instance, _surface, nullptr);
+	
+	  vmaDestroyAllocator(_allocator);
+		fmt::println("{}: Vulkan Memory Allocator was destroyed.", GetName());
 
 		vkDestroyDevice(_device, nullptr);
+		fmt::println("{}: Vulkan Logical Device was destroyed.", GetName());
+		
+		vkDestroySurfaceKHR(_instance, _surface, nullptr);
+		fmt::println("{}: Vulkan Surface was destroyed.", GetName());
+
 		vkb::destroy_debug_utils_messenger(_instance, _debug_messenger);
+
 		vkDestroyInstance(_instance, nullptr);
+		fmt::println("{}: Vulkan Instance was destroyed.", GetName());
 
 		SDL_DestroyWindow(_window);
 	}
 }
 
+
 void VulkanEngine::draw()
 {
-	//check if window is minimized and skip drawing
+	// Check if window is minimized and skip drawing
 	if (SDL_GetWindowFlags(_window) & SDL_WINDOW_MINIMIZED)
+	{
 		return;
+	}
 
 	//wait until the gpu has finished rendering the last frame. Timeout of 1 second
-	VK_CHECK(vkWaitForFences(_device, 1, &_renderFence, true, 1000000000));
-	VK_CHECK(vkResetFences(_device, 1, &_renderFence));
+	VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true, 1000000000));
+	VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
 
 	//now that we are sure that the commands finished executing, we can safely reset the command buffer to begin recording again.
-	VK_CHECK(vkResetCommandBuffer(_mainCommandBuffer, 0));
+	VK_CHECK(vkResetCommandBuffer(get_current_frame()._mainCommandBuffer, 0));
 
 	//request image from the swapchain
 	uint32_t swapchainImageIndex;
-	VK_CHECK(vkAcquireNextImageKHR(_device, _swapchain, 1000000000, _presentSemaphore, nullptr, &swapchainImageIndex));
+	VK_CHECK(vkAcquireNextImageKHR(_device, _swapchain, 1000000000, get_current_frame()._presentSemaphore, nullptr, &swapchainImageIndex));
 
 	//naming it cmd for shorter writing
-	VkCommandBuffer cmd = _mainCommandBuffer;
+	VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
 
 	//begin the command buffer recording. We will use this command buffer exactly once, so we want to let vulkan know that
 	VkCommandBufferBeginInfo cmdBeginInfo = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -146,7 +157,7 @@ void VulkanEngine::draw()
 	//make a clear-color from frame number. This will flash with a 120 frame period.
 	VkClearValue clearValue;
 	float flash = abs(sin(_frameNumber / 120.f));
-	clearValue.color = { { 0.0f, 0.0f, flash, 1.0f } };
+	clearValue.color = {{0.0f, 0.0f, flash, 1.0f}};
 
 	//clear depth at 1
 	VkClearValue depthClear;
@@ -229,14 +240,15 @@ void VulkanEngine::draw()
 	submit.pWaitDstStageMask = &waitStage;
 
 	submit.waitSemaphoreCount = 1;
-	submit.pWaitSemaphores = &_presentSemaphore;
+	submit.pWaitSemaphores = &get_current_frame()._presentSemaphore;
 
 	submit.signalSemaphoreCount = 1;
-	submit.pSignalSemaphores = &_renderSemaphore;
+	submit.pSignalSemaphores = &get_current_frame()._renderSemaphore;
 
 	//submit command buffer to the queue and execute it.
 	// _renderFence will now block until the graphic commands finish execution
-	VK_CHECK(vkQueueSubmit(_graphicsQueue, 1, &submit, _renderFence));
+	VK_CHECK(vkQueueSubmit(_graphicsQueue, 1, &submit, get_current_frame()._renderFence));
+	// VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
 
 	//prepare present
 	// this will put the image we just rendered to into the visible window.
@@ -247,7 +259,7 @@ void VulkanEngine::draw()
 	presentInfo.pSwapchains = &_swapchain;
 	presentInfo.swapchainCount = 1;
 
-	presentInfo.pWaitSemaphores = &_renderSemaphore;
+	presentInfo.pWaitSemaphores = &get_current_frame()._renderSemaphore;
 	presentInfo.waitSemaphoreCount = 1;
 
 	presentInfo.pImageIndices = &swapchainImageIndex;
@@ -287,6 +299,7 @@ void VulkanEngine::run()
 			}
 			mMainCamera.ProcessSDLEvent(e);
 		}
+
 		update_scene();
 
 		draw();
@@ -299,19 +312,19 @@ void VulkanEngine::init_vulkan()
 	if (volkInitialize() != VK_SUCCESS)
 	{
 		#ifdef DEBUG
-    fmt::println("{}: WARNING! Volk failed to load.", getName());
+    fmt::println("{}: WARNING! Volk failed to load.", GetName());
 		#endif
     return;
   }
 	#ifdef DEBUG
-  fmt::println("{}: Volk loaded successfully.", getName());
+  fmt::println("{}: Volk loaded successfully.", GetName());
 	#endif
 
 
 	vkb::InstanceBuilder builder;
 
 	//make the vulkan instance, with basic debug features
-	auto inst_ret = builder.set_app_name(args_.programName.c_str())
+	auto inst_ret = builder.set_app_name(mArgs.programName.c_str())
 		.request_validation_layers(bUseValidationLayers)
 		.use_default_debug_messenger()
 		.require_api_version(1, 1, 0)
@@ -344,7 +357,7 @@ void VulkanEngine::init_vulkan()
 
 	vkb::Device vkbDevice = deviceBuilder.build().value();
 
-	fmt::println("{}: Logical device created successfully.", getName());
+	fmt::println("{}: Logical device created successfully.", GetName());
 
 	// Get the VkDevice handle used in the rest of a vulkan application
 	_device = vkbDevice.device;
@@ -380,19 +393,19 @@ void VulkanEngine::init_vulkan()
 
   if (vmaCreateAllocator(&allocatorInfo, &_allocator) != VK_SUCCESS)
 	{
-    fmt::println("{}: ERROR! Failed to create vulkan memory allocator.", getName());
+    fmt::println("{}: ERROR! Failed to create vulkan memory allocator.", GetName());
     return;
   };
 
-  fmt::println("{}: Vulkan Memory Allocator created successfully.", getName());
+  fmt::println("{}: Vulkan Memory Allocator created successfully.", GetName());
 
 
 
 
 
-	_mainDeletionQueue.push_function([&]() {
-		vmaDestroyAllocator(_allocator);
-	});
+	// _mainDeletionQueue.push_function([&]() {
+	// 	vmaDestroyAllocator(_allocator);
+	// });
 }
 
 
@@ -548,8 +561,8 @@ void VulkanEngine::init_framebuffers()
 	const uint32_t swapchain_imagecount = _swapchainImages.size();
 	_framebuffers = std::vector<VkFramebuffer>(swapchain_imagecount);
 
-	for (int i = 0; i < swapchain_imagecount; i++) {
-
+	for (int i = 0; i < swapchain_imagecount; i++)
+	{
 		VkImageView attachments[2];
 		attachments[0] = _swapchainImageViews[i];
 		attachments[1] = _depthImageView;
@@ -571,16 +584,19 @@ void VulkanEngine::init_commands()
 	//we also want the pool to allow for resetting of individual command buffers
 	VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(_graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
-	VK_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_commandPool));
+	for (int i = 0; i < FRAME_OVERLAP; i++)
+	{
+		VK_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_frames[i]._commandPool));
 
-	//allocate the default command buffer that we will use for rendering
-	VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(_commandPool, 1);
+		//allocate the default command buffer that we will use for rendering
+		VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(_frames[i]._commandPool, 1);
 
-	VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_mainCommandBuffer));
+		VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_frames[i]._mainCommandBuffer));
 
-	_mainDeletionQueue.push_function([=]() {
-		vkDestroyCommandPool(_device, _commandPool, nullptr);
-	});
+		_mainDeletionQueue.push_function([=]() {
+			vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr);
+		});
+	}
 }
 
 void VulkanEngine::init_sync_structures()
@@ -591,22 +607,27 @@ void VulkanEngine::init_sync_structures()
 	//we want the fence to start signalled so we can wait on it on the first frame
 	VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
 
-	VK_CHECK(vkCreateFence(_device, &fenceCreateInfo, nullptr, &_renderFence));
-
-	//enqueue the destruction of the fence
-	_mainDeletionQueue.push_function([=]() {
-		vkDestroyFence(_device, _renderFence, nullptr);
-		});
 	VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
 
-	VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_presentSemaphore));
-	VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_renderSemaphore));
-	
-	//enqueue the destruction of semaphores
-	_mainDeletionQueue.push_function([=]() {
-		vkDestroySemaphore(_device, _presentSemaphore, nullptr);
-		vkDestroySemaphore(_device, _renderSemaphore, nullptr);
-		});
+	for (int i = 0; i < FRAME_OVERLAP; i++)
+	{
+		VK_CHECK(vkCreateFence(_device, &fenceCreateInfo, nullptr, &_frames[i]._renderFence));
+
+		//enqueue the destruction of the fence
+		_mainDeletionQueue.push_function([=]() {
+			vkDestroyFence(_device, _frames[i]._renderFence, nullptr);
+			});
+
+
+		VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_frames[i]._presentSemaphore));
+		VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_frames[i]._renderSemaphore));
+
+		//enqueue the destruction of semaphores
+		_mainDeletionQueue.push_function([=]() {
+			vkDestroySemaphore(_device, _frames[i]._presentSemaphore, nullptr);
+			vkDestroySemaphore(_device, _frames[i]._renderSemaphore, nullptr);
+			});
+	}
 }
 
  
@@ -918,24 +939,12 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
 
 void VulkanEngine::load_meshes()
 {
-	//make the array 3 vertices long
-	_triangleMesh._vertices.resize(3);
-
-	//vertex positions
-	_triangleMesh._vertices[0].position = { 1.f,1.f, 0.0f };
-	_triangleMesh._vertices[1].position = { -1.f,1.f, 0.0f };
-	_triangleMesh._vertices[2].position = { 0.f,-1.f, 0.0f };
-
-	//vertex colors, all green
-	_triangleMesh._vertices[0].color = { 0.f,1.f, 0.0f }; //pure green
-	_triangleMesh._vertices[1].color = { 0.f,1.f, 0.0f }; //pure green
-	_triangleMesh._vertices[2].color = { 0.f,1.f, 0.0f }; //pure green
 	//we dont care about the vertex normals
 
 	//load the monkey
 	_monkeyMesh.load_from_obj("../../assets/monkey_smooth.obj");
 
-	upload_mesh(_triangleMesh);
+
 	upload_mesh(_monkeyMesh);
 }
 
@@ -1020,4 +1029,10 @@ void VulkanEngine::update_scene()
 	// for (int i = 0; i < 16; i++) {
 		// loadedScenes["structure"] -> Draw(glm::mat4{ 1.f }, drawCommands);
 	//}
+}
+
+
+FrameData &VulkanEngine::get_current_frame()
+{
+	return _frames[_frameNumber % FRAME_OVERLAP];
 }

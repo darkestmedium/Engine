@@ -43,8 +43,9 @@ struct DeletionQueue
 	void flush()
 	{
 		// reverse iterate the deletion queue to execute all the functions
-		for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
-				(*it)(); //call functors
+		for (auto it = deletors.rbegin(); it != deletors.rend(); it++)
+		{
+			(*it)(); // call functors
 		}
 
 		deletors.clear();
@@ -76,18 +77,23 @@ struct FrameData {
 	VkCommandBuffer _mainCommandBuffer;
 };
 
+constexpr unsigned int FRAME_OVERLAP = 2;
 
-
-class VulkanEngine {
+class VulkanEngine
+{
 public:
 
+	// Constructors
 	VulkanEngine(ProgramConfig &args)
-		: args_(args)
+		: mArgs(args)
 	{};
-		
-	ProgramConfig &args_;
 
-	bool _isInitialized{ false };
+	// Destructors
+	~VulkanEngine() {Deinitialize();};
+		
+	ProgramConfig &mArgs;
+
+	bool bIsInitialized{ false };
 	int _frameNumber{ 0 };
 	int _selectedShader{ 0 };
 
@@ -111,9 +117,6 @@ public:
 
 	VkQueue _graphicsQueue;
 	uint32_t _graphicsQueueFamily;
-
-	VkCommandPool _commandPool;
-	VkCommandBuffer _mainCommandBuffer;
 	
 	VkRenderPass _renderPass;
 
@@ -134,7 +137,6 @@ public:
 	DeletionQueue _mainDeletionQueue;
 
 	VkPipeline _meshPipeline;
-	Mesh _triangleMesh;
 	Mesh _monkeyMesh;
 
 	VkPipelineLayout _meshPipelineLayout;
@@ -148,13 +150,19 @@ public:
 	//the format for the depth image
 	VkFormat _depthFormat;
 
-	const char *getName();
+	//frame storage
+	FrameData _frames[FRAME_OVERLAP];
+
+	//getter for the frame we are rendering to right now.
+	FrameData& get_current_frame();
+
+	const char *GetName();
 
 	//initializes everything in the engine
 	void init();
 
 	//shuts down the engine
-	void cleanup();
+	void Deinitialize();
 
 	//draw loop
 	void draw();
@@ -179,11 +187,11 @@ private:
 	void init_pipelines();
 
 	// loads a shader module from a spir-v file. Returns false if it errors
-	bool load_shader_module(const char* filePath, VkShaderModule* outShaderModule);
+	bool load_shader_module(const char* filePath, VkShaderModule *outShaderModule);
 
 	void load_meshes();
 
-	void upload_mesh(Mesh& mesh);
+	void upload_mesh(Mesh &mesh);
 
 
 

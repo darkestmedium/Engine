@@ -116,6 +116,6 @@ void Camera::ProcessSDLEvent(SDL_Event& event)
 void Camera::Update()
 {
 	glm::mat4 cameraRotation = GetRotationMatrix();
-	// mPosition += glm::vec3(cameraRotation * glm::vec4(mVelocity * 0.5f, 0.f));
-	mPosition += glm::vec3(cameraRotation * glm::vec4(mVelocity, 0.0f));
+	mPosition += glm::vec3(cameraRotation * glm::vec4(mVelocity * 0.75f, 0.f));
+	// mPosition += glm::vec3(cameraRotation * glm::vec4(mVelocity, 0.0f));
 }
