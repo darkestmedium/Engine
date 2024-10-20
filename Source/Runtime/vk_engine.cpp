@@ -97,7 +97,6 @@ void VulkanEngine::init()
 
 	mMainCamera = Camera({0.0f, 0.0f, 2.0f});
 	
-	//everything went fine
 	_isInitialized = true;
 }
 void VulkanEngine::cleanup()
@@ -172,31 +171,6 @@ void VulkanEngine::draw()
   // CAMERA
 	// Model rotation
 	glm::mat4 model = glm::rotate(glm::mat4{ 1.0f }, glm::radians(_frameNumber * 0.4f), glm::vec3(0, 1, 0));
-
-	// // Camera position
-	// float nearClip = 0.1f;
-	// float farClip = 100.0f;
-
-	// glm::vec3 camPos = { 0.0f, 0.f, -2.0f };
-	// glm::mat4 view = glm::lookAt(camPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-	// //camera projection
-
-	// glm::mat4 projection = glm::perspective(glm::radians(70.0f), _windowExtent.width / (float) _windowExtent.height, nearClip, farClip);
-	// projection[1][1] *= -1;
-
-	// ViewUniforms mViewUniforms;
-	// mViewUniforms.view = view;
-	// mViewUniforms.proj = projection;
-	// mViewUniforms.pos = camPos;
-	// // // Compute near and far points in view space or world space
-	// mViewUniforms.nearPoint = glm::vec3(0.0f, 0.0f, nearClip); // near plane point
-	// mViewUniforms.farPoint = glm::vec3(0.0f, 0.0f, farClip);  // far plane point
-	// // Compute near and far points in world space
-	// // viewUniforms.nearPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -nearClip, 1.0f); // near plane point in world space
-	// // viewUniforms.farPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -farClip, 1.0f);  // far plane point in world space
-	// update_scene();
-
 
 	// Render Monkey head
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _meshPipeline);
@@ -308,7 +282,7 @@ void VulkanEngine::run()
 					}
 				}
 			}
-			mMainCamera.processSDLEvent(e);
+			mMainCamera.ProcessSDLEvent(e);
 		}
 		update_scene();
 
@@ -1010,7 +984,7 @@ void VulkanEngine::upload_mesh(Mesh& mesh)
 
 void VulkanEngine::update_scene()
 {
-	mMainCamera.update();
+	mMainCamera.Update();
 
 	// glm::mat4 view = mMainCamera.getViewMatrix();
 
@@ -1018,7 +992,7 @@ void VulkanEngine::update_scene()
 	glm::mat4 projection = glm::perspective(
 		glm::radians(70.0f),
 		(float)_windowExtent.width / (float)_windowExtent.height,
-		mMainCamera.nearClip, mMainCamera.farClip
+		mMainCamera.GetNearClip(), mMainCamera.GetFarClip()
 	);
 
 	// invert the Y direction on projection matrix so that we are more similar
@@ -1029,12 +1003,12 @@ void VulkanEngine::update_scene()
 	// sceneData.proj = projection;
 	// sceneData.viewproj = projection * view;
 
-	mViewUniforms.view = mMainCamera.getViewMatrix();
+	mViewUniforms.view = mMainCamera.GetViewMatrix();
 	mViewUniforms.proj = projection;
-	mViewUniforms.pos = mMainCamera.position;
+	mViewUniforms.pos = mMainCamera.GetPosition();
 	// // Compute near and far points in view space or world space
-	mViewUniforms.nearPoint = glm::vec3(0.0f, 0.0f, mMainCamera.nearClip); // near plane point
-	mViewUniforms.farPoint = glm::vec3(0.0f, 0.0f, mMainCamera.farClip);  // far plane point
+	mViewUniforms.nearPoint = glm::vec3(0.0f, 0.0f, mMainCamera.GetNearClip()); // near plane point
+	mViewUniforms.farPoint = glm::vec3(0.0f, 0.0f, mMainCamera.GetFarClip());  // far plane point
 	// Compute near and far points in world space
 	// viewUniforms.nearPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -nearClip, 1.0f); // near plane point in world space
 	// viewUniforms.farPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -farClip, 1.0f);  // far plane point in world space
