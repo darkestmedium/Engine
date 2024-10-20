@@ -6,11 +6,12 @@
 class Transform
 {
 public:
-  glm::vec3 position;
 
   Transform()
-		: position(0.0f, 0.0f, 1.0f)
+		: position(0.0f, 0.0f, 0.0f)
 	{};
+
+  glm::vec3 position;
 
 	void Reset(void) {position = {0.0f, 0.0f, 0.0f};};
 

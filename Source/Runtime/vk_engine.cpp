@@ -94,6 +94,8 @@ void VulkanEngine::init()
 	init_pipelines();
 
 	load_meshes();
+
+	mMainCamera = Camera({0.0f, 0.0f, 2.0f});
 	
 	//everything went fine
 	_isInitialized = true;
@@ -171,35 +173,29 @@ void VulkanEngine::draw()
 	// Model rotation
 	glm::mat4 model = glm::rotate(glm::mat4{ 1.0f }, glm::radians(_frameNumber * 0.4f), glm::vec3(0, 1, 0));
 
-	// Camera position
-	float nearClip = 0.1f;
-	float farClip = 100.0f;
+	// // Camera position
+	// float nearClip = 0.1f;
+	// float farClip = 100.0f;
 
-	glm::vec3 camPos = { 0.0f, 0.f, -2.0f };
-	glm::mat4 view = glm::lookAt(camPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	// glm::vec3 camPos = { 0.0f, 0.f, -2.0f };
+	// glm::mat4 view = glm::lookAt(camPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-	//camera projection
+	// //camera projection
 
-	glm::mat4 projection = glm::perspective(glm::radians(70.0f), _windowExtent.width / (float) _windowExtent.height, nearClip, farClip);
-	projection[1][1] *= -1;
+	// glm::mat4 projection = glm::perspective(glm::radians(70.0f), _windowExtent.width / (float) _windowExtent.height, nearClip, farClip);
+	// projection[1][1] *= -1;
 
-	ViewUniforms viewUniforms;
-	viewUniforms.view = view;
-	viewUniforms.proj = projection;
-	viewUniforms.pos = camPos;
-	// // Compute near and far points in view space or world space
-	viewUniforms.nearPoint = glm::vec3(0.0f, 0.0f, nearClip); // near plane point
-	viewUniforms.farPoint = glm::vec3(0.0f, 0.0f, farClip);  // far plane point
-	// Compute near and far points in world space
-	// viewUniforms.nearPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -nearClip, 1.0f); // near plane point in world space
-	// viewUniforms.farPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -farClip, 1.0f);  // far plane point in world space
-
-
-
-
-
-
-
+	// ViewUniforms mViewUniforms;
+	// mViewUniforms.view = view;
+	// mViewUniforms.proj = projection;
+	// mViewUniforms.pos = camPos;
+	// // // Compute near and far points in view space or world space
+	// mViewUniforms.nearPoint = glm::vec3(0.0f, 0.0f, nearClip); // near plane point
+	// mViewUniforms.farPoint = glm::vec3(0.0f, 0.0f, farClip);  // far plane point
+	// // Compute near and far points in world space
+	// // viewUniforms.nearPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -nearClip, 1.0f); // near plane point in world space
+	// // viewUniforms.farPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -farClip, 1.0f);  // far plane point in world space
+	// update_scene();
 
 
 	// Render Monkey head
@@ -210,7 +206,7 @@ void VulkanEngine::draw()
 	vkCmdBindVertexBuffers(cmd, 0, 1, &_monkeyMesh._vertexBuffer._buffer, &offset);
 
 	// Calculate final mesh matrix
-	glm::mat4 mesh_matrix = projection * view * model;
+	glm::mat4 mesh_matrix = mViewUniforms.proj * mViewUniforms.view * model;
 
 	MeshPushConstants constants;
 	constants.render_matrix = mesh_matrix;
@@ -223,15 +219,6 @@ void VulkanEngine::draw()
 
 
 
-
-
-
-
-
-
-
-
-
 	// Draw grid
 	// once we start adding rendering commands, they will go here
 	if (_selectedShader == 0)
@@ -241,20 +228,10 @@ void VulkanEngine::draw()
 	else
 	{
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipeline);
-		vkCmdPushConstants(cmd, mGridPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewUniforms), &viewUniforms);
+		vkCmdPushConstants(cmd, mGridPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewUniforms), &mViewUniforms);
 	}
 
 	vkCmdDraw(cmd, 6, 1, 0, 0);
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -331,7 +308,9 @@ void VulkanEngine::run()
 					}
 				}
 			}
+			mMainCamera.processSDLEvent(e);
 		}
+		update_scene();
 
 		draw();
 	}
@@ -1019,4 +998,49 @@ void VulkanEngine::upload_mesh(Mesh& mesh)
 	memcpy(data, mesh._vertices.data(), mesh._vertices.size() * sizeof(Vertex));
 
 	vmaUnmapMemory(_allocator, mesh._vertexBuffer._allocation);
+}
+
+
+
+
+
+
+
+
+
+void VulkanEngine::update_scene()
+{
+	mMainCamera.update();
+
+	// glm::mat4 view = mMainCamera.getViewMatrix();
+
+	// camera projection
+	glm::mat4 projection = glm::perspective(
+		glm::radians(70.0f),
+		(float)_windowExtent.width / (float)_windowExtent.height,
+		mMainCamera.nearClip, mMainCamera.farClip
+	);
+
+	// invert the Y direction on projection matrix so that we are more similar
+	// to opengl and gltf axis
+	projection[1][1] *= -1;
+
+	// sceneData.view = view;
+	// sceneData.proj = projection;
+	// sceneData.viewproj = projection * view;
+
+	mViewUniforms.view = mMainCamera.getViewMatrix();
+	mViewUniforms.proj = projection;
+	mViewUniforms.pos = mMainCamera.position;
+	// // Compute near and far points in view space or world space
+	mViewUniforms.nearPoint = glm::vec3(0.0f, 0.0f, mMainCamera.nearClip); // near plane point
+	mViewUniforms.farPoint = glm::vec3(0.0f, 0.0f, mMainCamera.farClip);  // far plane point
+	// Compute near and far points in world space
+	// viewUniforms.nearPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -nearClip, 1.0f); // near plane point in world space
+	// viewUniforms.farPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -farClip, 1.0f);  // far plane point in world space
+
+
+	// for (int i = 0; i < 16; i++) {
+		// loadedScenes["structure"] -> Draw(glm::mat4{ 1.f }, drawCommands);
+	//}
 }

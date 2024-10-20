@@ -1,23 +1,45 @@
 #pragma once
 
-// #include "vk_types.h"
-#include "Transform.h"
-
-// #define GLM_FORCE_RADIANS
-// #define GLM_FORCE_DEPTH_ZERO_TO_ONE
-
-// #include <glm/vec4.hpp>
-// #include <glm/mat4x4.hpp>
-// #include <glm/gtc/matrix_transform.hpp>
+#include "vk_types.h"
+// #include "Transform.h"
 
 
-class Camera : public Transform
+#include <SDL3/SDL_events.h>
+
+
+
+// class Camera : public Transform
+class Camera
 {
+public:
 
-  // Camera()
-	// 	: position(0.0f, 0.0f, 1.0f)
-	// {};
+	// Constructors
+	Camera(glm::vec3 position = {0.0f, 0.0f, 0.0f}, glm::vec3 velocity = {0.0f, 0.0f, 0.0f}, float pitch = 0.0f, float yaw = 0.0f, float nearClip = 0.01f, float farClip = 1000.0f)
+		: position(position)
+		, velocity(velocity)
+		, pitch(pitch)
+		, yaw(yaw)
+		, nearClip(nearClip)
+		, farClip(farClip)
+	{}
 
+	// Destructors
+	~Camera() {};
+
+	glm::vec3 position;
+	glm::vec3 velocity;
+
+ 	float pitch;  // vertical rotation
+	float yaw;	// horizontal rotation
+
+	float nearClip, farClip;
+
+	glm::mat4 getViewMatrix() const;
+	glm::mat4 getRotationMatrix() const;
+
+	void processSDLEvent(SDL_Event &event);
+
+	void update();
 };
 
 

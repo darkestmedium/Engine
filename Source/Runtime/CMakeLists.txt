@@ -20,6 +20,7 @@ add_executable(Engine
 	vk_mesh.h
 	vk_types.h
 	Camera.h
+	Camera.cpp
 	Transform.h
 )
 

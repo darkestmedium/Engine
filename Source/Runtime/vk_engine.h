@@ -9,6 +9,8 @@
 #include <vk_initializers.h>
 #include <vk_mesh.h>
 
+#include "Camera.h"
+
 
 
 
@@ -86,7 +88,7 @@ public:
 	ProgramConfig &args_;
 
 	bool _isInitialized{ false };
-	int _frameNumber {0};
+	int _frameNumber{ 0 };
 	int _selectedShader{ 0 };
 
 	VkExtent2D _windowExtent;
@@ -97,6 +99,12 @@ public:
 	VkDebugUtilsMessengerEXT _debug_messenger;
 	VkPhysicalDevice _chosenGPU;
 	VkDevice _device;
+
+
+	// CAMERA
+	Camera mMainCamera;
+	ViewUniforms mViewUniforms;
+	
 
 	VkSemaphore _presentSemaphore, _renderSemaphore;
 	VkFence _renderFence;
@@ -176,4 +184,8 @@ private:
 	void load_meshes();
 
 	void upload_mesh(Mesh& mesh);
+
+
+
+	void update_scene();
 };
