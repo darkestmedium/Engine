@@ -86,6 +86,14 @@ struct ViewUniforms
 };
 
 
+struct GPUCameraData
+{
+	glm::mat4 view;
+	glm::mat4 proj;
+	glm::mat4 viewproj;
+};
+
+
 struct FrameData
 {
 	VkSemaphore _presentSemaphore, _renderSemaphore;
@@ -93,6 +101,9 @@ struct FrameData
 
 	VkCommandPool _commandPool;
 	VkCommandBuffer _mainCommandBuffer;
+
+	AllocatedBuffer cameraBuffer;
+	VkDescriptorSet globalDescriptor;
 };
 
 
@@ -201,6 +212,8 @@ private:
 
 	void init_sync_structures();
 
+	void init_descriptors();
+
 	void init_pipelines();
 
 	// loads a shader module from a spir-v file. Returns false if it errors
@@ -233,4 +246,9 @@ private:
 	void draw_objects(VkCommandBuffer cmd, RenderObject *first, int count);
 
 	void init_scene();
+
+	AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+
+	VkDescriptorSetLayout _globalSetLayout;
+	VkDescriptorPool _descriptorPool;
 };
