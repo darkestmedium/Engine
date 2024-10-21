@@ -14,7 +14,7 @@
 
 
 
-void GetPlatformStr(void)
+void PrintPlatformStr(void)
 {
 	#if defined(__linux__)
 		fmt::println("Main: __linux__ is defined.");
@@ -35,6 +35,7 @@ int main(int argc, char* argv[])
 	if (args.help)
 	{
 		args.DisplayHelp();
+		
 		return 0;
 	}
 
@@ -42,18 +43,15 @@ int main(int argc, char* argv[])
 	{
 		#define DEBUG
 		args.print();  // Prints all variables
-		GetPlatformStr();
+		PrintPlatformStr();
 		fmt::println("Main: Current working directory: {}", std::filesystem::current_path().c_str());
 	}
 
-	// Init Engine
 	VulkanEngine engine(args);
 
 	engine.init();
 	
 	engine.run();
-
-	// engine.Deinitialize();
 
 	return 0;
 }

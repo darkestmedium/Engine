@@ -53,7 +53,8 @@ struct DeletionQueue
 };
 
 
-struct MeshPushConstants {
+struct MeshPushConstants
+{
 	glm::vec4 data;
 	glm::mat4 render_matrix;
 };
@@ -126,11 +127,9 @@ public:
 	VkPhysicalDevice _chosenGPU;
 	VkDevice _device;
 
-
 	// CAMERA
 	Camera mMainCamera;
 	ViewUniforms mViewUniforms;
-	
 
 	VkSemaphore _presentSemaphore, _renderSemaphore;
 	VkFence _renderFence;
@@ -148,15 +147,16 @@ public:
 	std::vector<VkImage> _swapchainImages;
 	std::vector<VkImageView> _swapchainImageViews;
 
+	DeletionQueue _mainDeletionQueue;
+
+	// Pipelines
 	VkPipelineLayout mGridPipelineLayout;
 	VkPipeline mGridPipeline;
 
-	DeletionQueue _mainDeletionQueue;
-
-	VkPipeline _meshPipeline;
-	Mesh _monkeyMesh;
-
 	VkPipelineLayout _meshPipelineLayout;
+	VkPipeline _meshPipeline;
+
+	Mesh _monkeyMesh;
 
 	VmaAllocator _allocator; //vma lib allocator
 
@@ -210,8 +210,6 @@ private:
 
 	void upload_mesh(Mesh &mesh);
 
-
-
 	void update_scene();
 
 	//default array of renderable objects
@@ -223,13 +221,13 @@ private:
 	// functions
 
 	//create material and add it to the map
-	Material* create_material(VkPipeline pipeline, VkPipelineLayout layout,const std::string& name);
+	Material *create_material(VkPipeline pipeline, VkPipelineLayout layout,const std::string& name);
 
 	//returns nullptr if it can't be found
-	Material* get_material(const std::string& name);
+	Material *get_material(const std::string& name);
 
 	//returns nullptr if it can't be found
-	Mesh* get_mesh(const std::string& name);
+	Mesh *get_mesh(const std::string& name);
 
 	//our draw function
 	void draw_objects(VkCommandBuffer cmd, RenderObject *first, int count);

@@ -127,6 +127,8 @@ void VulkanEngine::Deinitialize()
 
 		SDL_DestroyWindow(_window);
 		fmt::println("{}: SDL Windows was destroyed.", GetName());
+
+		fmt::println("{}: Exiting application.", GetName());
 	}
 }
 
@@ -181,9 +183,7 @@ void VulkanEngine::draw()
 	vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 
-
 	draw_objects(cmd, _renderables.data(), _renderables.size());
-
 
 
 	// Draw grid
@@ -194,7 +194,6 @@ void VulkanEngine::draw()
 		vkCmdPushConstants(cmd, mGridPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewUniforms), &mViewUniforms);
 		vkCmdDraw(cmd, 6, 1, 0, 0);
 	}
-
 
 
 	// Finalize the render pass
@@ -640,8 +639,7 @@ void VulkanEngine::init_sync_structures()
 		//enqueue the destruction of the fence
 		_mainDeletionQueue.push_function([=]() {
 			vkDestroyFence(_device, _frames[i]._renderFence, nullptr);
-			});
-
+		});
 
 		VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_frames[i]._presentSemaphore));
 		VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_frames[i]._renderSemaphore));
@@ -689,15 +687,25 @@ void VulkanEngine::init_pipelines()
 	}
 	fmt::println("{}: Grid vertex shader succesfully loaded", GetName());
 
+	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
 
-	// INIT DEFAULT PIPELINE 
-	// Build the stage-create-info for both vertex and fragment stages. This lets the pipeline know the shader modules per stage
+	// INIT DEFAULT MESH PIPELINE 
 	PipelineBuilder pipelineBuilder
 	{
+		._shaderStages
+		{
+			vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader),
+			vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader),
+		},
 		// Vertex input controls how to read vertices from vertex buffers. We arent using it yet
-		._vertexInputInfo = vkinit::vertex_input_state_create_info(),
-		// Input assembly is the configuration for drawing triangle lists, strips, or individual points.
-		// we are just going to draw triangle list
+		// ._vertexInputInfo = vkinit::vertex_input_state_create_info(),
+		._vertexInputInfo
+		{
+			.vertexBindingDescriptionCount = static_cast<uint32_t>(vertexDescription.bindings.size()),
+			.pVertexBindingDescriptions = vertexDescription.bindings.data(),
+			.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexDescription.attributes.size()),
+			.pVertexAttributeDescriptions = vertexDescription.attributes.data(),
+		},
 		._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST),
 		._viewport
 		{
@@ -710,30 +718,14 @@ void VulkanEngine::init_pipelines()
 		},
 		._scissor
 		{
-			.offset = { 0, 0 },
+			.offset = {0, 0},
 			.extent = _windowExtent,
 		},
 		._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL),
-		// A single blend attachment with no blending and writing to RGBA
-		._colorBlendAttachment = vkinit::color_blend_attachment_state(),
+		._colorBlendAttachment = vkinit::color_blend_attachment_state(),  // A single blend attachment with no blending and writing to RGBA
 		._multisampling = vkinit::multisampling_state_create_info(),
-		// Default depthtesting
 		._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL),
-		// use the triangle layout we created
 	};
-
-	// MESH PIPELINE
-	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
-
-	// Connect the pipeline builder vertex input info to the one we get from Vertex
-	pipelineBuilder._vertexInputInfo.pVertexAttributeDescriptions = vertexDescription.attributes.data();
-	pipelineBuilder._vertexInputInfo.vertexAttributeDescriptionCount = vertexDescription.attributes.size();
-
-	pipelineBuilder._vertexInputInfo.pVertexBindingDescriptions = vertexDescription.bindings.data();
-	pipelineBuilder._vertexInputInfo.vertexBindingDescriptionCount = vertexDescription.bindings.size();
-
-	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader));
-	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
 
 	// Setup push constants and pipeline layout
 	VkPushConstantRange push_constant
@@ -742,10 +734,10 @@ void VulkanEngine::init_pipelines()
 		.offset = 0,
 		.size = sizeof(MeshPushConstants),
 	};
-	VkPipelineLayoutCreateInfo mesh_pipeline_layout_info = vkinit::pipeline_layout_create_info();
-	mesh_pipeline_layout_info.pPushConstantRanges = &push_constant;
-	mesh_pipeline_layout_info.pushConstantRangeCount = 1;
-	VK_CHECK(vkCreatePipelineLayout(_device, &mesh_pipeline_layout_info, nullptr, &_meshPipelineLayout));
+	VkPipelineLayoutCreateInfo meshPipelineLayoutCreateInfo = vkinit::pipeline_layout_create_info();
+	meshPipelineLayoutCreateInfo.pPushConstantRanges = &push_constant;
+	meshPipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+	VK_CHECK(vkCreatePipelineLayout(_device, &meshPipelineLayoutCreateInfo, nullptr, &_meshPipelineLayout));
 	// Hook the push constants layout
 	pipelineBuilder._pipelineLayout = _meshPipelineLayout;
 	_meshPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
@@ -753,11 +745,7 @@ void VulkanEngine::init_pipelines()
 
 	create_material(_meshPipeline, _meshPipelineLayout, "defaultmesh");
 
-
-
-
 	// GRID PIPELINE
-	// Add the other shaders
 	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, gridVertShader));
 	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, gridFragShader));
 	// Setup push constants and pipeline layout
@@ -774,7 +762,6 @@ void VulkanEngine::init_pipelines()
 	// Hook the push constants layout
 	pipelineBuilder._pipelineLayout = mGridPipelineLayout;
 	mGridPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
-
 
 	// Cleanup!
 	vkDestroyShaderModule(_device, meshVertShader, nullptr);
@@ -922,7 +909,6 @@ void VulkanEngine::load_meshes()
 
 	_meshes["monkey"] = monkeyMesh;
 	_meshes["triangle"] = triMesh;
-
 }
 
 
@@ -975,37 +961,23 @@ void VulkanEngine::update_scene()
 {
 	mMainCamera.Update();
 
-	// glm::mat4 view = mMainCamera.getViewMatrix();
 
-	// camera projection
-	glm::mat4 projection = glm::perspective(
-		glm::radians(70.0f),
-		(float)_windowExtent.width / (float)_windowExtent.height,
-		mMainCamera.GetNearClip(), mMainCamera.GetFarClip()
-	);
+	glm::mat4 projection
+	{
+		glm::perspective(
+			glm::radians(70.0f),
+			(float)_windowExtent.width / (float)_windowExtent.height,
+			mMainCamera.GetNearClip(), mMainCamera.GetFarClip()
+		)
+	};
 
-	// invert the Y direction on projection matrix so that we are more similar
-	// to opengl and gltf axis
 	projection[1][1] *= -1;
-
-	// sceneData.view = view;
-	// sceneData.proj = projection;
-	// sceneData.viewproj = projection * view;
 
 	mViewUniforms.view = mMainCamera.GetViewMatrix();
 	mViewUniforms.proj = projection;
 	mViewUniforms.pos = mMainCamera.GetPosition();
-	// // Compute near and far points in view space or world space
 	mViewUniforms.nearPoint = glm::vec3(0.0f, 0.0f, mMainCamera.GetNearClip()); // near plane point
 	mViewUniforms.farPoint = glm::vec3(0.0f, 0.0f, mMainCamera.GetFarClip());  // far plane point
-	// Compute near and far points in world space
-	// viewUniforms.nearPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -nearClip, 1.0f); // near plane point in world space
-	// viewUniforms.farPoint = glm::inverse(view) * glm::vec4(0.0f, 0.0f, -farClip, 1.0f);  // far plane point in world space
-
-
-	// for (int i = 0; i < 16; i++) {
-		// loadedScenes["structure"] -> Draw(glm::mat4{ 1.f }, drawCommands);
-	//}
 }
 
 
@@ -1013,7 +985,6 @@ FrameData &VulkanEngine::get_current_frame()
 {
 	return _frames[_frameNumber % FRAME_OVERLAP];
 }
-
 
 
 Material* VulkanEngine::create_material(VkPipeline pipeline, VkPipelineLayout layout, const std::string& name)
@@ -1024,6 +995,7 @@ Material* VulkanEngine::create_material(VkPipeline pipeline, VkPipelineLayout la
 	_materials[name] = mat;
 	return &_materials[name];
 }
+
 
 Material* VulkanEngine::get_material(const std::string &name)
 {

@@ -3,7 +3,8 @@
 #include <vk_types.h>
 
 
-struct VertexInputDescription {
+struct VertexInputDescription
+{
 	std::vector<VkVertexInputBindingDescription> bindings;
 	std::vector<VkVertexInputAttributeDescription> attributes;
 
@@ -11,8 +12,8 @@ struct VertexInputDescription {
 };
 
 
-struct Vertex {
-
+struct Vertex
+{
 	glm::vec3 position;
 	glm::vec3 normal;
 	glm::vec3 color;
@@ -20,7 +21,9 @@ struct Vertex {
 	static VertexInputDescription get_vertex_description();
 }; 
 
-struct Mesh {
+
+struct Mesh
+{
 	std::vector<Vertex> _vertices;
 
 	AllocatedBuffer _vertexBuffer;
