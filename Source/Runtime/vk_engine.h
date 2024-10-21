@@ -148,9 +148,6 @@ public:
 	std::vector<VkImage> _swapchainImages;
 	std::vector<VkImageView> _swapchainImageViews;
 
-	VkPipelineLayout _trianglePipelineLayout;
-	VkPipeline _trianglePipeline;
-
 	VkPipelineLayout mGridPipelineLayout;
 	VkPipeline mGridPipeline;
 

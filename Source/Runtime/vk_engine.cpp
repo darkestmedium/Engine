@@ -657,7 +657,7 @@ void VulkanEngine::init_sync_structures()
  
 void VulkanEngine::init_pipelines()
 {
-	// TRIANGLE PIPELINE
+	// MESH PIPELINE
 	VkShaderModule triangleFragShader;
 	if (!load_shader_module("./Shaders/colored_triangle.frag.spv", &triangleFragShader))
 	{
@@ -665,15 +665,16 @@ void VulkanEngine::init_pipelines()
 	}
 	fmt::println("{}: Triangle fragment shader succesfully loaded", GetName());
 
-	VkShaderModule triangleVertexShader;
-	if (!load_shader_module("./Shaders/colored_triangle.vert.spv", &triangleVertexShader))
+	VkShaderModule meshVertShader;
+	if (!load_shader_module("./Shaders/tri_mesh_pushconstants.vert.spv", &meshVertShader))
 	{
-		fmt::println("{}: Error when building the triangle vertex shader module", GetName());
+		fmt::println("{}: Error when building the tri mesh vertex shader module.", GetName());
 	}
-	fmt::println("{}: Triangle vertex shader succesfully loaded", GetName());
+	else {
+		fmt::println("{}: Tri mesh vertex shader succesfully loaded", GetName());
+	}
 
 	// GRID PIPELINE
-	// Compile grid shader modules.
 	VkShaderModule gridFragShader;
 	if (!load_shader_module("./Shaders/Grid.frag.spv", &gridFragShader))
 	{
@@ -687,16 +688,6 @@ void VulkanEngine::init_pipelines()
 		fmt::println("{}: Error when building the grid vertex shader module", GetName());
 	}
 	fmt::println("{}: Grid vertex shader succesfully loaded", GetName());
-
-	// MESH PIPELINE
-	VkShaderModule meshVertShader;
-	if (!load_shader_module("./Shaders/tri_mesh_pushconstants.vert.spv", &meshVertShader))
-	{
-		fmt::println("{}: Error when building the tri mesh vertex shader module.", GetName());
-	}
-	else {
-		fmt::println("{}: Tri mesh vertex shader succesfully loaded", GetName());
-	}
 
 
 	// INIT DEFAULT PIPELINE 
@@ -731,52 +722,6 @@ void VulkanEngine::init_pipelines()
 		// use the triangle layout we created
 	};
 
-	// TRIANGLE PIPELINE
-	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, triangleVertexShader));
-	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
-
-
-	// Build the pipeline layout that controls the inputs/outputs of the shader
-	// we are not using descriptor sets or other systems yet, so no need to use anything other than empty default
-	VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
-	VK_CHECK(vkCreatePipelineLayout(_device, &pipeline_layout_info, nullptr, &_trianglePipelineLayout));
-	// Use the triangle layout we created
-	pipelineBuilder._pipelineLayout = _trianglePipelineLayout;
-
-	// Finally build the pipeline
-	_trianglePipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
-	pipelineBuilder._shaderStages.clear();
-
-
-
-	// GRID PIPELINE
-	// Add the other shaders
-	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, gridVertShader));
-	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, gridFragShader));
-
-	// Setup push constants
-	VkPushConstantRange view_constant
-	{
-		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-		.offset = 0,
-		.size = sizeof(ViewUniforms),
-	};
-
-	VkPipelineLayoutCreateInfo grid_pipeline_layout_info = vkinit::pipeline_layout_create_info();
-	grid_pipeline_layout_info.pPushConstantRanges = &view_constant;
-	grid_pipeline_layout_info.pushConstantRangeCount = 1;
-
-	VK_CHECK(vkCreatePipelineLayout(_device, &grid_pipeline_layout_info, nullptr, &mGridPipelineLayout));
-
-	//hook the push constants layout
-	pipelineBuilder._pipelineLayout = mGridPipelineLayout;
-	//build the grid pipeline
-	mGridPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
-	pipelineBuilder._shaderStages.clear();
-	
-
-
-
 	// MESH PIPELINE
 	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
 
@@ -787,48 +732,61 @@ void VulkanEngine::init_pipelines()
 	pipelineBuilder._vertexInputInfo.pVertexBindingDescriptions = vertexDescription.bindings.data();
 	pipelineBuilder._vertexInputInfo.vertexBindingDescriptionCount = vertexDescription.bindings.size();
 
-
 	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader));
 	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
 
-	// Setup push constants
+	// Setup push constants and pipeline layout
 	VkPushConstantRange push_constant
 	{
 		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
 		.offset = 0,
 		.size = sizeof(MeshPushConstants),
 	};
-
 	VkPipelineLayoutCreateInfo mesh_pipeline_layout_info = vkinit::pipeline_layout_create_info();
 	mesh_pipeline_layout_info.pPushConstantRanges = &push_constant;
 	mesh_pipeline_layout_info.pushConstantRangeCount = 1;
-
 	VK_CHECK(vkCreatePipelineLayout(_device, &mesh_pipeline_layout_info, nullptr, &_meshPipelineLayout));
-
-	//hook the push constants layout
+	// Hook the push constants layout
 	pipelineBuilder._pipelineLayout = _meshPipelineLayout;
-	//build the mesh triangle pipeline
 	_meshPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
+	pipelineBuilder._shaderStages.clear();
 
 	create_material(_meshPipeline, _meshPipelineLayout, "defaultmesh");
 
 
 
 
+	// GRID PIPELINE
+	// Add the other shaders
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, gridVertShader));
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, gridFragShader));
+	// Setup push constants and pipeline layout
+	VkPushConstantRange view_constant
+	{
+		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		.offset = 0,
+		.size = sizeof(ViewUniforms),
+	};
+	VkPipelineLayoutCreateInfo grid_pipeline_layout_info = vkinit::pipeline_layout_create_info();
+	grid_pipeline_layout_info.pPushConstantRanges = &view_constant;
+	grid_pipeline_layout_info.pushConstantRangeCount = 1;
+	VK_CHECK(vkCreatePipelineLayout(_device, &grid_pipeline_layout_info, nullptr, &mGridPipelineLayout));
+	// Hook the push constants layout
+	pipelineBuilder._pipelineLayout = mGridPipelineLayout;
+	mGridPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
+
+
 	// Cleanup!
 	vkDestroyShaderModule(_device, meshVertShader, nullptr);
+	vkDestroyShaderModule(_device, triangleFragShader, nullptr);
 	vkDestroyShaderModule(_device, gridVertShader, nullptr);
 	vkDestroyShaderModule(_device, gridFragShader, nullptr);
-	vkDestroyShaderModule(_device, triangleFragShader, nullptr);
-	vkDestroyShaderModule(_device, triangleVertexShader, nullptr);
 
-	_mainDeletionQueue.push_function([=]() {
+	_mainDeletionQueue.push_function([=]()
+	{
 		vkDestroyPipeline(_device, mGridPipeline, nullptr);
 		vkDestroyPipelineLayout(_device, mGridPipelineLayout, nullptr);
 	
-		vkDestroyPipeline(_device, _trianglePipeline, nullptr);
-		vkDestroyPipelineLayout(_device, _trianglePipelineLayout, nullptr);
-
 		vkDestroyPipeline(_device, _meshPipeline, nullptr);
 		vkDestroyPipelineLayout(_device, _meshPipelineLayout, nullptr);
 	});
@@ -988,13 +946,13 @@ void VulkanEngine::upload_mesh(Mesh& mesh)
 	VK_CHECK(vmaCreateBuffer(_allocator, &bufferInfo, &vmaallocInfo,
 		&mesh._vertexBuffer._buffer,
 		&mesh._vertexBuffer._allocation,
-		nullptr));
+		nullptr
+	));
 
 	//add the destruction of triangle mesh buffer to the deletion queue
 	_mainDeletionQueue.push_function([=]() {
-
 		vmaDestroyBuffer(_allocator, mesh._vertexBuffer._buffer, mesh._vertexBuffer._allocation);
-		});
+	});
 
 	//copy vertex data
 	void* data;
