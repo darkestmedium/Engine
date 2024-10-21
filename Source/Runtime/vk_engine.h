@@ -59,7 +59,23 @@ struct MeshPushConstants {
 };
 
 
-struct ViewUniforms {
+struct Material
+{
+	VkPipeline pipeline;
+	VkPipelineLayout pipelineLayout;
+};
+
+
+struct RenderObject
+{
+	Mesh *mesh;
+	Material *material; 
+	glm::mat4 transformMatrix;
+};
+
+
+struct ViewUniforms
+{
 	glm::mat4 view;
 	glm::mat4 proj;
 	glm::vec3 pos;
@@ -69,7 +85,8 @@ struct ViewUniforms {
 };
 
 
-struct FrameData {
+struct FrameData
+{
 	VkSemaphore _presentSemaphore, _renderSemaphore;
 	VkFence _renderFence;	
 
@@ -79,6 +96,7 @@ struct FrameData {
 
 
 constexpr unsigned int FRAME_OVERLAP = 2;
+
 
 class VulkanEngine
 {
@@ -97,7 +115,7 @@ public:
 
 	bool bIsInitialized;
 	int _frameNumber{ 0 };
-	int _selectedShader{ 0 };
+	int _displayGrid{ 0 };
 
 	VkExtent2D _windowExtent;
 
@@ -198,4 +216,26 @@ private:
 
 
 	void update_scene();
+
+	//default array of renderable objects
+	std::vector<RenderObject> _renderables;
+
+	std::unordered_map<std::string,Material> _materials;
+	std::unordered_map<std::string,Mesh> _meshes;
+
+	// functions
+
+	//create material and add it to the map
+	Material* create_material(VkPipeline pipeline, VkPipelineLayout layout,const std::string& name);
+
+	//returns nullptr if it can't be found
+	Material* get_material(const std::string& name);
+
+	//returns nullptr if it can't be found
+	Mesh* get_mesh(const std::string& name);
+
+	//our draw function
+	void draw_objects(VkCommandBuffer cmd, RenderObject *first, int count);
+
+	void init_scene();
 };

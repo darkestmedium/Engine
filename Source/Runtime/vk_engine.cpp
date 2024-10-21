@@ -94,6 +94,8 @@ void VulkanEngine::init()
 
 	load_meshes();
 
+	init_scene();
+
 	mMainCamera = Camera({0.0f, 0.0f, 2.0f});
 	
 	bIsInitialized = true;
@@ -158,7 +160,7 @@ void VulkanEngine::draw()
 
 	//make a clear-color from frame number. This will flash with a 120 frame period.
 	VkClearValue clearValue;
-	float flash = abs(sin(_frameNumber / 120.f));
+	float flash = abs(sin(_frameNumber / 120.0f));
 	clearValue.color = {{0.0f, 0.0f, flash, 1.0f}};
 
 	//clear depth at 1
@@ -169,10 +171,10 @@ void VulkanEngine::draw()
 	//We will use the clear color from above, and the framebuffer of the index the swapchain gave us
 	VkRenderPassBeginInfo rpInfo = vkinit::renderpass_begin_info(_renderPass, _windowExtent, _framebuffers[swapchainImageIndex]);
 
-	//connect clear values
+	// Connect clear values
 	rpInfo.clearValueCount = 2;
 
-	VkClearValue clearValues[] = { clearValue, depthClear };
+	VkClearValue clearValues[] = {clearValue, depthClear};
 
 	rpInfo.pClearValues = &clearValues[0];
 
@@ -180,53 +182,22 @@ void VulkanEngine::draw()
 
 
 
-
-  // CAMERA
-	// Model rotation
-	glm::mat4 model = glm::rotate(glm::mat4{ 1.0f }, glm::radians(_frameNumber * 0.4f), glm::vec3(0, 1, 0));
-
-	// Render Monkey head
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _meshPipeline);
-
-	//bind the mesh vertex buffer with offset 0
-	VkDeviceSize offset = 0;
-	vkCmdBindVertexBuffers(cmd, 0, 1, &_monkeyMesh._vertexBuffer._buffer, &offset);
-
-	// Calculate final mesh matrix
-	glm::mat4 mesh_matrix = mViewUniforms.proj * mViewUniforms.view * model;
-
-	MeshPushConstants constants;
-	constants.render_matrix = mesh_matrix;
-
-	//upload the matrix to the gpu via pushconstants
-	vkCmdPushConstants(cmd, _meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
-
-	// we can now draw the mesh
-	vkCmdDraw(cmd, _monkeyMesh._vertices.size(), 1, 0, 0);
+	draw_objects(cmd, _renderables.data(), _renderables.size());
 
 
 
 	// Draw grid
 	// once we start adding rendering commands, they will go here
-	if (_selectedShader == 0)
+	if (_displayGrid == 0)
 	{
-		// vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipeline);
 		vkCmdPushConstants(cmd, mGridPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewUniforms), &mViewUniforms);
 		vkCmdDraw(cmd, 6, 1, 0, 0);
 	}
-	// else
-	// {
-	// 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipeline);
-	// 	vkCmdPushConstants(cmd, mGridPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewUniforms), &mViewUniforms);
-	// 	vkCmdDraw(cmd, 6, 1, 0, 0);
-	// }
 
 
 
-
-
-	//finalize the render pass
+	// Finalize the render pass
 	vkCmdEndRenderPass(cmd);
 
 	//finalize the command buffer (we can no longer add commands, but it can now be executed)
@@ -272,6 +243,57 @@ void VulkanEngine::draw()
 	_frameNumber++;
 }
 
+
+
+
+
+void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject *first, int count)
+{
+	Mesh *lastMesh = nullptr;
+	Material *lastMaterial = nullptr;
+	for (int i = 0; i < count; i++)
+	{
+		RenderObject &object = first[i];
+
+		// Only bind the pipeline if it doesn't match with the already bound one.
+		if (object.material != lastMaterial)
+		{
+			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipeline);
+			lastMaterial = object.material;
+		}
+
+		glm::mat4 model = object.transformMatrix;
+		// Final render matrix, that we are calculating on the cpu.
+		glm::mat4 mesh_matrix = mViewUniforms.proj * mViewUniforms.view * model;
+
+		MeshPushConstants constants;
+		constants.render_matrix = mesh_matrix;
+
+		// Upload the mesh to the GPU via push constants.
+		vkCmdPushConstants(cmd, object.material->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
+
+		// Only bind the mesh if it's a different one from last bind.
+		if (object.mesh != lastMesh)
+		{
+			// Bind the mesh vertex buffer with offset 0.
+			VkDeviceSize offset = 0;
+			vkCmdBindVertexBuffers(cmd, 0, 1, &object.mesh->_vertexBuffer._buffer, &offset);
+			lastMesh = object.mesh;
+		}
+		// We can now draw.
+		vkCmdDraw(cmd, object.mesh->_vertices.size(), 1, 0, 0);
+	}
+}
+
+
+
+
+
+
+
+
+
+
 void VulkanEngine::run()
 {
 	SDL_Event e;
@@ -292,10 +314,10 @@ void VulkanEngine::run()
 			{
 				if (e.key.key == SDLK_G)
 				{
-					_selectedShader += 1;
-					if (_selectedShader > 1)
+					_displayGrid += 1;
+					if (_displayGrid > 1)
 					{
-						_selectedShader = 0;
+						_displayGrid = 0;
 					}
 				}
 			}
@@ -814,6 +836,8 @@ void VulkanEngine::init_pipelines()
 	//build the mesh triangle pipeline
 	_meshPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
 
+	create_material(_meshPipeline, _meshPipelineLayout, "defaultmesh");
+
 
 
 
@@ -839,10 +863,11 @@ void VulkanEngine::init_pipelines()
 
 bool VulkanEngine::load_shader_module(const char* filePath, VkShaderModule* outShaderModule)
 {
-	//open the file. With cursor at the end
+	// Open the file. With cursor at the end
 	std::ifstream file(filePath, std::ios::ate | std::ios::binary);
 
-	if (!file.is_open()) {
+	if (!file.is_open())
+	{
 		return false;
 	}
 
@@ -927,8 +952,8 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
 
 	//its easy to error out on create graphics pipeline, so we handle it a bit better than the common VK_CHECK case
 	VkPipeline newPipeline;
-	if (vkCreateGraphicsPipelines(
-		device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &newPipeline) != VK_SUCCESS) {
+	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &newPipeline) != VK_SUCCESS) 
+	{
 		std::cout << "failed to create pipline\n";
 		return VK_NULL_HANDLE; // failed to create graphics pipeline
 	}
@@ -941,13 +966,31 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
 
 void VulkanEngine::load_meshes()
 {
+	Mesh triMesh{};
+	//make the array 3 vertices long
+	triMesh._vertices.resize(3);
+
+	//vertex positions
+	triMesh._vertices[0].position = { 1.f,1.f, 0.0f };
+	triMesh._vertices[1].position = { -1.f,1.f, 0.0f };
+	triMesh._vertices[2].position = { 0.f,-1.f, 0.0f };
+
+	//vertex colors, all green
+	triMesh._vertices[0].color = { 0.f,1.f, 0.0f }; //pure green
+	triMesh._vertices[1].color = { 0.f,1.f, 0.0f }; //pure green
+	triMesh._vertices[2].color = { 0.f,1.f, 0.0f }; //pure green
 	//we dont care about the vertex normals
 
 	//load the monkey
-	_monkeyMesh.load_from_obj("../../assets/monkey_smooth.obj");
+	Mesh monkeyMesh{};
+	monkeyMesh.load_from_obj("../../assets/monkey_smooth.obj");
 
+	upload_mesh(triMesh);
+	upload_mesh(monkeyMesh);
 
-	upload_mesh(_monkeyMesh);
+	_meshes["monkey"] = monkeyMesh;
+	_meshes["triangle"] = triMesh;
+
 }
 
 
@@ -1037,4 +1080,65 @@ void VulkanEngine::update_scene()
 FrameData &VulkanEngine::get_current_frame()
 {
 	return _frames[_frameNumber % FRAME_OVERLAP];
+}
+
+
+
+Material* VulkanEngine::create_material(VkPipeline pipeline, VkPipelineLayout layout, const std::string& name)
+{
+	Material mat;
+	mat.pipeline = pipeline;
+	mat.pipelineLayout = layout;
+	_materials[name] = mat;
+	return &_materials[name];
+}
+
+Material* VulkanEngine::get_material(const std::string &name)
+{
+	//search for the object, and return nullptr if not found
+	auto it = _materials.find(name);
+	if (it == _materials.end()) {
+		return nullptr;
+	}
+	else {
+		return &(*it).second;
+	}
+}
+
+
+Mesh* VulkanEngine::get_mesh(const std::string &name)
+{
+	auto it = _meshes.find(name);
+	if (it == _meshes.end()) {
+		return nullptr;
+	}
+	else {
+		return &(*it).second;
+	}
+}
+
+
+void VulkanEngine::init_scene()
+{
+	RenderObject monkey;
+	monkey.mesh = get_mesh("monkey");
+	monkey.material = get_material("defaultmesh");
+	monkey.transformMatrix = glm::mat4{ 1.0f };
+
+	_renderables.push_back(monkey);
+
+	for (int x = -20; x <= 20; x++)
+	{
+		for (int y = -20; y <= 20; y++)
+		{
+			RenderObject tri;
+			tri.mesh = get_mesh("triangle");
+			tri.material = get_material("defaultmesh");
+			glm::mat4 translation = glm::translate(glm::mat4{ 1.0 }, glm::vec3(x, 0, y));
+			glm::mat4 scale = glm::scale(glm::mat4{ 1.0 }, glm::vec3(0.2, 0.2, 0.2));
+			tri.transformMatrix = translation * scale;
+
+			_renderables.push_back(tri);
+		}
+	}
 }
