@@ -657,119 +657,112 @@ void VulkanEngine::init_sync_structures()
  
 void VulkanEngine::init_pipelines()
 {
+	// TRIANGLE PIPELINE
 	VkShaderModule triangleFragShader;
 	if (!load_shader_module("./Shaders/colored_triangle.frag.spv", &triangleFragShader))
 	{
-		std::cout << "Error when building the triangle fragment shader module" << std::endl;
+		fmt::println("{}: Error when building the triangle fragment shader module", GetName());
 	}
-	else {
-		std::cout << "Triangle fragment shader succesfully loaded" << std::endl;
-	}
+	fmt::println("{}: Triangle fragment shader succesfully loaded", GetName());
 
 	VkShaderModule triangleVertexShader;
 	if (!load_shader_module("./Shaders/colored_triangle.vert.spv", &triangleVertexShader))
 	{
-		std::cout << "Error when building the triangle vertex shader module" << std::endl;
+		fmt::println("{}: Error when building the triangle vertex shader module", GetName());
 	}
-	else {
-		std::cout << "Triangle vertex shader succesfully loaded" << std::endl;
-	}
-
-	//build the pipeline layout that controls the inputs/outputs of the shader
-	//we are not using descriptor sets or other systems yet, so no need to use anything other than empty default
-	VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
-
-	VK_CHECK(vkCreatePipelineLayout(_device, &pipeline_layout_info, nullptr, &_trianglePipelineLayout));
-
-	//build the stage-create-info for both vertex and fragment stages. This lets the pipeline know the shader modules per stage
-	PipelineBuilder pipelineBuilder;
-
-	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, triangleVertexShader));
-	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
-
-	//vertex input controls how to read vertices from vertex buffers. We arent using it yet
-	pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info();
-
-	//input assembly is the configuration for drawing triangle lists, strips, or individual points.
-	//we are just going to draw triangle list
-	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-
-	//build viewport and scissor from the swapchain extents
-	pipelineBuilder._viewport.x = 0.0f;
-	pipelineBuilder._viewport.y = 0.0f;
-	pipelineBuilder._viewport.width = (float)_windowExtent.width;
-	pipelineBuilder._viewport.height = (float)_windowExtent.height;
-	pipelineBuilder._viewport.minDepth = 0.0f;
-	pipelineBuilder._viewport.maxDepth = 1.0f;
-
-	pipelineBuilder._scissor.offset = { 0, 0 };
-	pipelineBuilder._scissor.extent = _windowExtent;
-
-	//configure the rasterizer to draw filled triangles
-	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL);
-
-	//we dont use multisampling, so just run the default one
-	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info();
-
-	//a single blend attachment with no blending and writing to RGBA
-	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state();
-
-	//use the triangle layout we created
-	pipelineBuilder._pipelineLayout = _trianglePipelineLayout;
-
-	//default depthtesting
-	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
-
-	//finally build the pipeline
-	_trianglePipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
-
-	//clear the shader stages for the builder
-	pipelineBuilder._shaderStages.clear();
-
-
-
-
-
+	fmt::println("{}: Triangle vertex shader succesfully loaded", GetName());
 
 	// GRID PIPELINE
 	// Compile grid shader modules.
 	VkShaderModule gridFragShader;
 	if (!load_shader_module("./Shaders/Grid.frag.spv", &gridFragShader))
 	{
-		std::cout << "Error when building the grid fragment shader module" << std::endl;
+		fmt::println("{}: Error when building the grid fragment shader module", GetName());
 	}
-	else
-	{
-		std::cout << "Grid fragment shader succesfully loaded" << std::endl;
-	}
+	fmt::println("{}: Grid fragment shader succesfully loaded", GetName());
 
 	VkShaderModule gridVertShader;
 	if (!load_shader_module("./Shaders/Grid.vert.spv", &gridVertShader))
 	{
-		std::cout << "Error when building the grid vertex shader module" << std::endl;
+		fmt::println("{}: Error when building the grid vertex shader module", GetName());
 	}
-	else
+	fmt::println("{}: Grid vertex shader succesfully loaded", GetName());
+
+	// MESH PIPELINE
+	VkShaderModule meshVertShader;
+	if (!load_shader_module("./Shaders/tri_mesh_pushconstants.vert.spv", &meshVertShader))
 	{
-		std::cout << "Grid vertex shader succesfully loaded" << std::endl;
+		fmt::println("{}: Error when building the tri mesh vertex shader module.", GetName());
+	}
+	else {
+		fmt::println("{}: Tri mesh vertex shader succesfully loaded", GetName());
 	}
 
 
+	// INIT DEFAULT PIPELINE 
+	// Build the stage-create-info for both vertex and fragment stages. This lets the pipeline know the shader modules per stage
+	PipelineBuilder pipelineBuilder
+	{
+		// Vertex input controls how to read vertices from vertex buffers. We arent using it yet
+		._vertexInputInfo = vkinit::vertex_input_state_create_info(),
+		// Input assembly is the configuration for drawing triangle lists, strips, or individual points.
+		// we are just going to draw triangle list
+		._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST),
+		._viewport
+		{
+			.x = 0.0f,	
+			.y = 0.0f,
+			.width = (float)_windowExtent.width,
+			.height = (float)_windowExtent.height,
+			.minDepth = 0.0f,
+			.maxDepth = 1.0f,
+		},
+		._scissor
+		{
+			.offset = { 0, 0 },
+			.extent = _windowExtent,
+		},
+		._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL),
+		// A single blend attachment with no blending and writing to RGBA
+		._colorBlendAttachment = vkinit::color_blend_attachment_state(),
+		._multisampling = vkinit::multisampling_state_create_info(),
+		// Default depthtesting
+		._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL),
+		// use the triangle layout we created
+	};
+
+	// TRIANGLE PIPELINE
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, triangleVertexShader));
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
+
+
+	// Build the pipeline layout that controls the inputs/outputs of the shader
+	// we are not using descriptor sets or other systems yet, so no need to use anything other than empty default
+	VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
+	VK_CHECK(vkCreatePipelineLayout(_device, &pipeline_layout_info, nullptr, &_trianglePipelineLayout));
+	// Use the triangle layout we created
+	pipelineBuilder._pipelineLayout = _trianglePipelineLayout;
+
+	// Finally build the pipeline
+	_trianglePipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
+	pipelineBuilder._shaderStages.clear();
+
+
+
+	// GRID PIPELINE
 	// Add the other shaders
 	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, gridVertShader));
 	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, gridFragShader));
 
+	// Setup push constants
+	VkPushConstantRange view_constant
+	{
+		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		.offset = 0,
+		.size = sizeof(ViewUniforms),
+	};
 
-	//we start from just the default empty pipeline layout info
 	VkPipelineLayoutCreateInfo grid_pipeline_layout_info = vkinit::pipeline_layout_create_info();
-
-	//setup push constants
-	VkPushConstantRange view_constant;
-	view_constant.offset = 0;
-	//size of a MeshPushConstant struct
-	view_constant.size = sizeof(ViewUniforms);
-	//for the vertex shader
-	view_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
 	grid_pipeline_layout_info.pPushConstantRanges = &view_constant;
 	grid_pipeline_layout_info.pushConstantRangeCount = 1;
 
@@ -779,15 +772,12 @@ void VulkanEngine::init_pipelines()
 	pipelineBuilder._pipelineLayout = mGridPipelineLayout;
 	//build the grid pipeline
 	mGridPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
-
 	pipelineBuilder._shaderStages.clear();
 	
 
 
 
-
-
-
+	// MESH PIPELINE
 	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
 
 	// Connect the pipeline builder vertex input info to the one we get from Vertex
@@ -798,34 +788,18 @@ void VulkanEngine::init_pipelines()
 	pipelineBuilder._vertexInputInfo.vertexBindingDescriptionCount = vertexDescription.bindings.size();
 
 
-
-	// MESH PIPELINE
-	VkShaderModule meshVertShader;
-	if (!load_shader_module("./Shaders/tri_mesh_pushconstants.vert.spv", &meshVertShader))
-	{
-		std::cout << "Error when building the triangle vertex shader module." << std::endl;
-	}
-	else {
-		std::cout << "Red Triangle vertex shader succesfully loaded" << std::endl;
-	}
-
-	//add the other shaders
 	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader));
-	//make sure that triangleFragShader is holding the compiled colored_triangle.frag
 	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
 
-	//we start from just the default empty pipeline layout info
+	// Setup push constants
+	VkPushConstantRange push_constant
+	{
+		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		.offset = 0,
+		.size = sizeof(MeshPushConstants),
+	};
+
 	VkPipelineLayoutCreateInfo mesh_pipeline_layout_info = vkinit::pipeline_layout_create_info();
-
-	//setup push constants
-	VkPushConstantRange push_constant;
-	//offset 0
-	push_constant.offset = 0;
-	//size of a MeshPushConstant struct
-	push_constant.size = sizeof(MeshPushConstants);
-	//for the vertex shader
-	push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
 	mesh_pipeline_layout_info.pPushConstantRanges = &push_constant;
 	mesh_pipeline_layout_info.pushConstantRangeCount = 1;
 
