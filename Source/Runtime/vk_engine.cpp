@@ -292,6 +292,11 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject *first, int co
 			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 0, 1, &get_current_frame().globalDescriptor, 1, &uniform_offset);
 			// Object data descriptor
 			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 1, 1, &get_current_frame().objectDescriptor, 0, nullptr);
+			if (object.material->textureSet != VK_NULL_HANDLE)
+			{
+				//texture descriptor
+				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 2, 1, &object.material->textureSet, 0, nullptr);
+			}
 		}
 
 		// Push Mesh Constants
@@ -706,6 +711,13 @@ void VulkanEngine::init_sync_structures()
 void VulkanEngine::init_pipelines()
 {
 	// MESH PIPELINE
+	VkShaderModule texturedMeshShader;
+	if (!load_shader_module("./Shaders/textured_lit.frag.spv", &texturedMeshShader))
+	{
+		fmt::println("{}: Error when building the textured mesh shader", GetName());
+	}
+	fmt::println("{}: Textured mesh shader successsfully loaded.", GetName());
+
 	VkShaderModule coloredMeshShader;
 	if (!load_shader_module("./Shaders/default_lit.frag.spv", &coloredMeshShader))
 	{
@@ -718,9 +730,7 @@ void VulkanEngine::init_pipelines()
 	{
 		fmt::println("{}: Error when building the tri mesh ssbo vertex shader module.", GetName());
 	}
-	else {
-		fmt::println("{}: Tri mesh ssbo vertex shader succesfully loaded.", GetName());
-	}
+	fmt::println("{}: Tri mesh ssbo vertex shader succesfully loaded.", GetName());
 
 	// GRID PIPELINE
 	VkShaderModule gridFragShader;
@@ -737,69 +747,116 @@ void VulkanEngine::init_pipelines()
 	}
 	fmt::println("{}: Grid vertex shader succesfully loaded.", GetName());
 
-	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
+	
+	//build the stage-create-info for both vertex and fragment stages. This lets the pipeline know the shader modules per stage
+	PipelineBuilder pipelineBuilder;
 
-	// INIT DEFAULT MESH PIPELINE 
-	PipelineBuilder pipelineBuilder
-	{
-		._shaderStages
-		{
-			vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader),
-			vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, coloredMeshShader),
-		},
-		// Vertex input controls how to read vertices from vertex buffers. We arent using it yet
-		// ._vertexInputInfo = vkinit::vertex_input_state_create_info(),
-		._vertexInputInfo
-		{
-			.vertexBindingDescriptionCount = static_cast<uint32_t>(vertexDescription.bindings.size()),
-			.pVertexBindingDescriptions = vertexDescription.bindings.data(),
-			.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexDescription.attributes.size()),
-			.pVertexAttributeDescriptions = vertexDescription.attributes.data(),
-		},
-		._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST),
-		._viewport
-		{
-			.x = 0.0f,	
-			.y = 0.0f,
-			.width = (float)_windowExtent.width,
-			.height = (float)_windowExtent.height,
-			.minDepth = 0.0f,
-			.maxDepth = 1.0f,
-		},
-		._scissor
-		{
-			.offset = {0, 0},
-			.extent = _windowExtent,
-		},
-		._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL),
-		._colorBlendAttachment = vkinit::color_blend_attachment_state(),  // A single blend attachment with no blending and writing to RGBA
-		._multisampling = vkinit::multisampling_state_create_info(),
-		._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL),
-	};
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader));
 
-	// Setup push constants and pipeline layout
-	VkPushConstantRange push_constant
-	{
-		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-		.offset = 0,
-		.size = sizeof(MeshPushConstants),
-	};
-	VkPipelineLayoutCreateInfo meshPipelineLayoutCreateInfo = vkinit::pipeline_layout_create_info();
-	meshPipelineLayoutCreateInfo.pPushConstantRanges = &push_constant;
-	meshPipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, coloredMeshShader));
+
+
+	//we start from just the default empty pipeline layout info
+	VkPipelineLayoutCreateInfo mesh_pipeline_layout_info = vkinit::pipeline_layout_create_info();
+
+	//setup push constants
+	VkPushConstantRange push_constant;
+	//offset 0
+	push_constant.offset = 0;
+	//size of a MeshPushConstant struct
+	push_constant.size = sizeof(MeshPushConstants);
+	//for the vertex shader
+	push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	mesh_pipeline_layout_info.pPushConstantRanges = &push_constant;
+	mesh_pipeline_layout_info.pushConstantRangeCount = 1;
 
 	VkDescriptorSetLayout setLayouts[] = { _globalSetLayout, _objectSetLayout };
 
-	meshPipelineLayoutCreateInfo.setLayoutCount = 2;
-	meshPipelineLayoutCreateInfo.pSetLayouts = setLayouts;
+	mesh_pipeline_layout_info.setLayoutCount = 2;
+	mesh_pipeline_layout_info.pSetLayouts = setLayouts;
 
-	VK_CHECK(vkCreatePipelineLayout(_device, &meshPipelineLayoutCreateInfo, nullptr, &_meshPipelineLayout));
-	// Hook the push constants layout
-	pipelineBuilder._pipelineLayout = _meshPipelineLayout;
-	_meshPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
+	VkPipelineLayout meshPipLayout;
+	VK_CHECK(vkCreatePipelineLayout(_device, &mesh_pipeline_layout_info, nullptr, &meshPipLayout));
+
+
+	//we start from  the normal mesh layout
+	VkPipelineLayoutCreateInfo textured_pipeline_layout_info = mesh_pipeline_layout_info;
+		
+	VkDescriptorSetLayout texturedSetLayouts[] = { _globalSetLayout, _objectSetLayout,_singleTextureSetLayout };
+
+	textured_pipeline_layout_info.setLayoutCount = 3;
+	textured_pipeline_layout_info.pSetLayouts = texturedSetLayouts;
+
+	VkPipelineLayout texturedPipeLayout;
+	VK_CHECK(vkCreatePipelineLayout(_device, &textured_pipeline_layout_info, nullptr, &texturedPipeLayout));
+
+	//hook the push constants layout
+	pipelineBuilder._pipelineLayout = meshPipLayout;
+
+	//vertex input controls how to read vertices from vertex buffers. We arent using it yet
+	pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info();
+
+	//input assembly is the configuration for drawing triangle lists, strips, or individual points.
+	//we are just going to draw triangle list
+	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+
+	//build viewport and scissor from the swapchain extents
+	pipelineBuilder._viewport.x = 0.0f;
+	pipelineBuilder._viewport.y = 0.0f;
+	pipelineBuilder._viewport.width = (float)_windowExtent.width;
+	pipelineBuilder._viewport.height = (float)_windowExtent.height;
+	pipelineBuilder._viewport.minDepth = 0.0f;
+	pipelineBuilder._viewport.maxDepth = 1.0f;
+
+	pipelineBuilder._scissor.offset = { 0, 0 };
+	pipelineBuilder._scissor.extent = _windowExtent;
+
+	//configure the rasterizer to draw filled triangles
+	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL);
+
+	//we dont use multisampling, so just run the default one
+	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info();
+
+	//a single blend attachment with no blending and writing to RGBA
+	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state();
+
+
+	//default depthtesting
+	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+
+	//build the mesh pipeline
+
+	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
+
+	//connect the pipeline builder vertex input info to the one we get from Vertex
+	pipelineBuilder._vertexInputInfo.pVertexAttributeDescriptions = vertexDescription.attributes.data();
+	pipelineBuilder._vertexInputInfo.vertexAttributeDescriptionCount = vertexDescription.attributes.size();
+
+	pipelineBuilder._vertexInputInfo.pVertexBindingDescriptions = vertexDescription.bindings.data();
+	pipelineBuilder._vertexInputInfo.vertexBindingDescriptionCount = vertexDescription.bindings.size();
+
+	
+	//build the mesh triangle pipeline
+	VkPipeline meshPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
+
+	create_material(meshPipeline, meshPipLayout, "defaultmesh");
+
 	pipelineBuilder._shaderStages.clear();
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader));
 
-	create_material(_meshPipeline, _meshPipelineLayout, "defaultmesh");
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, texturedMeshShader));
+
+	pipelineBuilder._pipelineLayout = texturedPipeLayout;
+	VkPipeline texPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
+	create_material(texPipeline, texturedPipeLayout, "texturedmesh");
+
+
+
 
 	// GRID PIPELINE
 	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, gridVertShader));
@@ -818,20 +875,29 @@ void VulkanEngine::init_pipelines()
 	// Hook the push constants layout
 	pipelineBuilder._pipelineLayout = mGridPipelineLayout;
 	mGridPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
+	fmt::println("{}: Grid pipeline was built successfully.", GetName());
 
-	// Cleanup!
+
+
+
 	vkDestroyShaderModule(_device, meshVertShader, nullptr);
 	vkDestroyShaderModule(_device, coloredMeshShader, nullptr);
+	vkDestroyShaderModule(_device, texturedMeshShader, nullptr);
+
 	vkDestroyShaderModule(_device, gridVertShader, nullptr);
 	vkDestroyShaderModule(_device, gridFragShader, nullptr);
+	
 
 	_mainDeletionQueue.push_function([=]()
 	{
 		vkDestroyPipeline(_device, mGridPipeline, nullptr);
 		vkDestroyPipelineLayout(_device, mGridPipelineLayout, nullptr);
-	
-		vkDestroyPipeline(_device, _meshPipeline, nullptr);
-		vkDestroyPipelineLayout(_device, _meshPipelineLayout, nullptr);
+
+		vkDestroyPipeline(_device, meshPipeline, nullptr);
+		vkDestroyPipeline(_device, texPipeline, nullptr);
+
+		vkDestroyPipelineLayout(_device, meshPipLayout, nullptr);
+		vkDestroyPipelineLayout(_device, texturedPipeLayout, nullptr);
 	});
 }
 
@@ -960,11 +1026,16 @@ void VulkanEngine::load_meshes()
 	Mesh monkeyMesh{};
 	monkeyMesh.load_from_obj("../../assets/monkey_smooth.obj");
 
+	Mesh lostEmpire{};
+	lostEmpire.load_from_obj("../../assets/lost_empire.obj");
+
 	upload_mesh(triMesh);
 	upload_mesh(monkeyMesh);
+	upload_mesh(lostEmpire);
 
 	_meshes["monkey"] = monkeyMesh;
 	_meshes["triangle"] = triMesh;
+	_meshes["empire"] = lostEmpire;
 }
 
 
@@ -1119,6 +1190,13 @@ void VulkanEngine::init_scene()
 
 	_renderables.push_back(monkey);
 
+	RenderObject map;
+	map.mesh = get_mesh("empire");
+	map.material = get_material("texturedmesh");
+	map.transformMatrix = glm::translate(glm::vec3{ 5,-10,0 }); //glm::mat4{ 1.0f };
+
+	_renderables.push_back(map);
+
 	for (int x = -20; x <= 20; x++)
 	{
 		for (int y = -20; y <= 20; y++)
@@ -1133,6 +1211,35 @@ void VulkanEngine::init_scene()
 			_renderables.push_back(tri);
 		}
 	}
+
+	Material *texturedMat =	get_material("texturedmesh");
+
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.pNext = nullptr;
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = _descriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = &_singleTextureSetLayout;
+
+	vkAllocateDescriptorSets(_device, &allocInfo, &texturedMat->textureSet);
+
+	VkSamplerCreateInfo samplerInfo = vkinit::sampler_create_info(VK_FILTER_NEAREST);
+
+	VkSampler blockySampler;
+	vkCreateSampler(_device, &samplerInfo, nullptr, &blockySampler);
+
+	_mainDeletionQueue.push_function([=]() {
+		vkDestroySampler(_device, blockySampler, nullptr);
+	});
+
+	VkDescriptorImageInfo imageBufferInfo;
+	imageBufferInfo.sampler = blockySampler;
+	imageBufferInfo.imageView = _loadedTextures["empire_diffuse"].imageView;
+	imageBufferInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkWriteDescriptorSet texture1 = vkinit::write_descriptor_image(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, texturedMat->textureSet, &imageBufferInfo, 0);
+
+	vkUpdateDescriptorSets(_device, 1, &texture1, 0, nullptr);
 }
 
 
@@ -1156,7 +1263,8 @@ AllocatedBuffer VulkanEngine::create_buffer(size_t allocSize, VkBufferUsageFlags
 	VK_CHECK(vmaCreateBuffer(_allocator, &bufferInfo, &vmaallocInfo,
 		&newBuffer._buffer,
 		&newBuffer._allocation,
-		nullptr));
+		nullptr
+	));
 
 	return newBuffer;
 }
@@ -1170,7 +1278,8 @@ void VulkanEngine::init_descriptors()
 	{
 		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10},
 		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10},
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10 }
+		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10},
+		{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10}
 	};
 
 	VkDescriptorPoolCreateInfo pool_info
@@ -1201,7 +1310,6 @@ void VulkanEngine::init_descriptors()
 	vkCreateDescriptorSetLayout(_device, &setinfo, nullptr, &_globalSetLayout);
 
 	VkDescriptorSetLayoutBinding objectBind = vkinit::descriptorset_layout_binding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0);
-
 	VkDescriptorSetLayoutCreateInfo set2info
 	{
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -1212,6 +1320,21 @@ void VulkanEngine::init_descriptors()
 	};
 
 	vkCreateDescriptorSetLayout(_device, &set2info, nullptr, &_objectSetLayout);
+
+
+	VkDescriptorSetLayoutBinding textureBind = vkinit::descriptorset_layout_binding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 0);
+	VkDescriptorSetLayoutCreateInfo set3info
+	{
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.bindingCount = 1,
+		.pBindings = &textureBind,
+
+	};
+
+	vkCreateDescriptorSetLayout(_device, &set3info, nullptr, &_singleTextureSetLayout);
+
 
 	const size_t sceneParamBufferSize = FRAME_OVERLAP * pad_uniform_buffer_size(sizeof(GPUSceneData));
 	_sceneParameterBuffer = create_buffer(sceneParamBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
@@ -1305,33 +1428,33 @@ size_t VulkanEngine::pad_uniform_buffer_size(size_t originalSize)
 }
 
 
-VkDescriptorSetLayoutBinding vkinit::descriptorset_layout_binding(VkDescriptorType type, VkShaderStageFlags stageFlags, uint32_t binding)
-{
-	VkDescriptorSetLayoutBinding setbind = {};
-	setbind.binding = binding;
-	setbind.descriptorCount = 1;
-	setbind.descriptorType = type;
-	setbind.pImmutableSamplers = nullptr;
-	setbind.stageFlags = stageFlags;
+// VkDescriptorSetLayoutBinding vkinit::descriptorset_layout_binding(VkDescriptorType type, VkShaderStageFlags stageFlags, uint32_t binding)
+// {
+// 	VkDescriptorSetLayoutBinding setbind = {};
+// 	setbind.binding = binding;
+// 	setbind.descriptorCount = 1;
+// 	setbind.descriptorType = type;
+// 	setbind.pImmutableSamplers = nullptr;
+// 	setbind.stageFlags = stageFlags;
 
-	return setbind;
-}
+// 	return setbind;
+// }
 
 
-VkWriteDescriptorSet vkinit::write_descriptor_buffer(VkDescriptorType type, VkDescriptorSet dstSet, VkDescriptorBufferInfo* bufferInfo , uint32_t binding)
-{
-	VkWriteDescriptorSet write = {};
-	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	write.pNext = nullptr;
+// VkWriteDescriptorSet vkinit::write_descriptor_buffer(VkDescriptorType type, VkDescriptorSet dstSet, VkDescriptorBufferInfo* bufferInfo , uint32_t binding)
+// {
+// 	VkWriteDescriptorSet write = {};
+// 	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+// 	write.pNext = nullptr;
 
-	write.dstBinding = binding;
-	write.dstSet = dstSet;
-	write.descriptorCount = 1;
-	write.descriptorType = type;
-	write.pBufferInfo = bufferInfo;
+// 	write.dstBinding = binding;
+// 	write.dstSet = dstSet;
+// 	write.descriptorCount = 1;
+// 	write.descriptorType = type;
+// 	write.pBufferInfo = bufferInfo;
 
-	return write;
-}
+// 	return write;
+// }
 
 
 

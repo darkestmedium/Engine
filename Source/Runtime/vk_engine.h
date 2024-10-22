@@ -199,8 +199,8 @@ public:
 	VkPipelineLayout mGridPipelineLayout;
 	VkPipeline mGridPipeline;
 
-	VkPipelineLayout _meshPipelineLayout;
-	VkPipeline _meshPipeline;
+	// VkPipelineLayout _meshPipelineLayout;
+	// VkPipeline _meshPipeline;
 
 	Mesh _monkeyMesh;
 
@@ -217,7 +217,7 @@ public:
 	FrameData _frames[FRAME_OVERLAP];
 
 	//getter for the frame we are rendering to right now.
-	FrameData& get_current_frame();
+	FrameData &get_current_frame();
 
 	const char *GetName();
 
@@ -241,6 +241,31 @@ public:
 	//texture hashmap
 	std::unordered_map<std::string, Texture> _loadedTextures;
 	void load_images();
+
+	// Default array of renderable objects
+	std::vector<RenderObject> _renderables;
+
+	std::unordered_map<std::string,Material> _materials;
+	std::unordered_map<std::string,Mesh> _meshes;
+
+	VkDescriptorSetLayout _globalSetLayout;
+	VkDescriptorSetLayout _objectSetLayout;
+	VkDescriptorSetLayout _singleTextureSetLayout;
+
+	VkDescriptorPool _descriptorPool;
+	VkPhysicalDeviceProperties _gpuProperties;
+
+	GPUSceneData _sceneParameters;
+	AllocatedBuffer _sceneParameterBuffer;
+	size_t pad_uniform_buffer_size(size_t originalSize);
+
+	//create material and add it to the map
+	Material *create_material(VkPipeline pipeline, VkPipelineLayout layout,const std::string &name);
+	//returns nullptr if it can't be found
+	Material *get_material(const std::string &name);
+	//returns nullptr if it can't be found
+	Mesh *get_mesh(const std::string &name);
+
 
 private:
 
@@ -269,39 +294,12 @@ private:
 
 	void update_scene();
 
-	//default array of renderable objects
-	std::vector<RenderObject> _renderables;
 
-	std::unordered_map<std::string,Material> _materials;
-	std::unordered_map<std::string,Mesh> _meshes;
-
-	// functions
-
-	//create material and add it to the map
-	Material *create_material(VkPipeline pipeline, VkPipelineLayout layout,const std::string& name);
-
-	//returns nullptr if it can't be found
-	Material *get_material(const std::string& name);
-
-	//returns nullptr if it can't be found
-	Mesh *get_mesh(const std::string& name);
-
-	//our draw function
+	// Our draw function
 	void draw_objects(VkCommandBuffer cmd, RenderObject *first, int count);
 
 	void init_scene();
 
-
-	VkDescriptorSetLayout _globalSetLayout;
-	VkDescriptorSetLayout _objectSetLayout;
-
-	VkDescriptorPool _descriptorPool;
-
-	VkPhysicalDeviceProperties _gpuProperties;
-
-	GPUSceneData _sceneParameters;
-	AllocatedBuffer _sceneParameterBuffer;
-	size_t pad_uniform_buffer_size(size_t originalSize);
 };
 
 
