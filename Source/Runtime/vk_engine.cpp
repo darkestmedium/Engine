@@ -266,6 +266,22 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject *first, int co
 	vmaUnmapMemory(_allocator, get_current_frame().cameraBuffer._allocation);
 
 
+	float framed = (_frameNumber / 120.f);
+
+	_sceneParameters.ambientColor = { sin(framed),0,cos(framed),1 };
+
+	char* sceneData;
+	vmaMapMemory(_allocator, _sceneParameterBuffer._allocation , (void**)&sceneData);
+
+	int frameIndex = _frameNumber % FRAME_OVERLAP;
+
+	sceneData += pad_uniform_buffer_size(sizeof(GPUSceneData)) * frameIndex;
+
+	memcpy(sceneData, &_sceneParameters, sizeof(GPUSceneData));
+
+	vmaUnmapMemory(_allocator, _sceneParameterBuffer._allocation);
+
+
 
 	Mesh *lastMesh = nullptr;
 	Material *lastMaterial = nullptr;
@@ -273,13 +289,14 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject *first, int co
 	{
 		RenderObject &object = first[i];
 
-		// Only bind the pipeline if it doesn't match with the already bound one.
+		//only bind the pipeline if it doesn't match with the already bound one
 		if (object.material != lastMaterial)
 		{
 			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipeline);
 			lastMaterial = object.material;
-			//bind the descriptor set when changing pipeline
-			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 0, 1, &get_current_frame().globalDescriptor, 0, nullptr);
+			// Offset for our scene buffer
+			uint32_t uniform_offset = pad_uniform_buffer_size(sizeof(GPUSceneData)) * frameIndex;
+			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 0, 1, &get_current_frame().globalDescriptor, 1, &uniform_offset);
 		}
 
 		glm::mat4 model = object.transformMatrix;
@@ -401,6 +418,9 @@ void VulkanEngine::init_vulkan()
 
 	vkb::Device vkbDevice = deviceBuilder.build().value();
 
+	_gpuProperties = vkbDevice.physical_device.properties;
+	fmt::println("{}: The GPU has a minimum buffer alignment of {}", GetName(), _gpuProperties.limits.minUniformBufferOffsetAlignment);
+
 	fmt::println("{}: Logical device created successfully.", GetName());
 
 	// Get the VkDevice handle used in the rest of a vulkan application
@@ -442,10 +462,6 @@ void VulkanEngine::init_vulkan()
   };
 
   fmt::println("{}: Vulkan Memory Allocator created successfully.", GetName());
-
-
-
-
 
 	// _mainDeletionQueue.push_function([&]() {
 	// 	vmaDestroyAllocator(_allocator);
@@ -677,12 +693,12 @@ void VulkanEngine::init_sync_structures()
 void VulkanEngine::init_pipelines()
 {
 	// MESH PIPELINE
-	VkShaderModule triangleFragShader;
-	if (!load_shader_module("./Shaders/colored_triangle.frag.spv", &triangleFragShader))
+	VkShaderModule coloredMeshShader;
+	if (!load_shader_module("./Shaders/default_lit.frag.spv", &coloredMeshShader))
 	{
-		fmt::println("{}: Error when building the triangle fragment shader module", GetName());
+		fmt::println("{}: Error when building the colored mesh fragment shader module.", GetName());
 	}
-	fmt::println("{}: Triangle fragment shader succesfully loaded", GetName());
+	fmt::println("{}: Colored mesh fragment shader succesfully loaded.", GetName());
 
 	VkShaderModule meshVertShader;
 	if (!load_shader_module("./Shaders/tri_mesh_descriptors.vert.spv", &meshVertShader))
@@ -690,23 +706,23 @@ void VulkanEngine::init_pipelines()
 		fmt::println("{}: Error when building the tri mesh vertex shader module.", GetName());
 	}
 	else {
-		fmt::println("{}: Tri mesh vertex shader succesfully loaded", GetName());
+		fmt::println("{}: Tri mesh vertex shader succesfully loaded.", GetName());
 	}
 
 	// GRID PIPELINE
 	VkShaderModule gridFragShader;
 	if (!load_shader_module("./Shaders/Grid.frag.spv", &gridFragShader))
 	{
-		fmt::println("{}: Error when building the grid fragment shader module", GetName());
+		fmt::println("{}: Error when building the grid fragment shader module.", GetName());
 	}
-	fmt::println("{}: Grid fragment shader succesfully loaded", GetName());
+	fmt::println("{}: Grid fragment shader succesfully loaded.", GetName());
 
 	VkShaderModule gridVertShader;
 	if (!load_shader_module("./Shaders/Grid.vert.spv", &gridVertShader))
 	{
-		fmt::println("{}: Error when building the grid vertex shader module", GetName());
+		fmt::println("{}: Error when building the grid vertex shader module.", GetName());
 	}
-	fmt::println("{}: Grid vertex shader succesfully loaded", GetName());
+	fmt::println("{}: Grid vertex shader succesfully loaded.", GetName());
 
 	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
 
@@ -716,7 +732,7 @@ void VulkanEngine::init_pipelines()
 		._shaderStages
 		{
 			vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader),
-			vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader),
+			vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, coloredMeshShader),
 		},
 		// Vertex input controls how to read vertices from vertex buffers. We arent using it yet
 		// ._vertexInputInfo = vkinit::vertex_input_state_create_info(),
@@ -791,7 +807,7 @@ void VulkanEngine::init_pipelines()
 
 	// Cleanup!
 	vkDestroyShaderModule(_device, meshVertShader, nullptr);
-	vkDestroyShaderModule(_device, triangleFragShader, nullptr);
+	vkDestroyShaderModule(_device, coloredMeshShader, nullptr);
 	vkDestroyShaderModule(_device, gridVertShader, nullptr);
 	vkDestroyShaderModule(_device, gridFragShader, nullptr);
 
@@ -1107,7 +1123,8 @@ void VulkanEngine::init_descriptors()
 	// Create a descriptor pool that will hold 10 uniform buffers
 	std::vector<VkDescriptorPoolSize> sizes
 	{
-		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10}
+		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10},
+		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10}
 	};
 
 	VkDescriptorPoolCreateInfo pool_info
@@ -1118,30 +1135,26 @@ void VulkanEngine::init_descriptors()
 		.poolSizeCount = (uint32_t)sizes.size(),
 		.pPoolSizes = sizes.data(),
 	};
+
 	vkCreateDescriptorPool(_device, &pool_info, nullptr, &_descriptorPool);
 
-	// Information about the binding.
-	VkDescriptorSetLayoutBinding camBufferBinding
-	{
-		.binding = 0,
-		// it's a uniform buffer binding
-		.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		.descriptorCount = 1,
-		// we use it from the vertex shader
-		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-	};
+	VkDescriptorSetLayoutBinding cameraBind = vkinit::descriptorset_layout_binding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,VK_SHADER_STAGE_VERTEX_BIT,0);
+	VkDescriptorSetLayoutBinding sceneBind = vkinit::descriptorset_layout_binding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 1);
+	
+	VkDescriptorSetLayoutBinding bindings[] = {cameraBind, sceneBind};
 
 	VkDescriptorSetLayoutCreateInfo setinfo
 	{
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.bindingCount = 1,
-		//point to the camera buffer binding
-		.pBindings = &camBufferBinding,
+		.bindingCount = 2,
+		.pBindings = bindings,
 	};
 	vkCreateDescriptorSetLayout(_device, &setinfo, nullptr, &_globalSetLayout);
 
+	const size_t sceneParamBufferSize = FRAME_OVERLAP * pad_uniform_buffer_size(sizeof(GPUSceneData));
+	_sceneParameterBuffer = create_buffer(sceneParamBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
 	for (int i = 0; i < FRAME_OVERLAP; i++)
 	{
@@ -1156,34 +1169,37 @@ void VulkanEngine::init_descriptors()
 			.descriptorSetCount = 1,
 			.pSetLayouts = &_globalSetLayout,
 		};
+	
 		vkAllocateDescriptorSets(_device, &allocInfo, &_frames[i].globalDescriptor);
 
-		// Information about the buffer we want to point at in the descriptor
-		VkDescriptorBufferInfo binfo
+		VkDescriptorBufferInfo cameraInfo
 		{
 			.buffer = _frames[i].cameraBuffer._buffer,
 			.offset = 0,
 			.range = sizeof(GPUCameraData),
 		};
 
-		VkWriteDescriptorSet setWrite
+		VkDescriptorBufferInfo sceneInfo
 		{
-			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.pNext = nullptr,
-			.dstSet = _frames[i].globalDescriptor,
-			.dstBinding = 0,
-			.descriptorCount = 1,
-			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			.pBufferInfo = &binfo,
+			.buffer = _sceneParameterBuffer._buffer,
+			.offset = 0,
+			.range = sizeof(GPUSceneData),
 		};
 
-		vkUpdateDescriptorSets(_device, 1, &setWrite, 0, nullptr);
+		VkWriteDescriptorSet cameraWrite = vkinit::write_descriptor_buffer(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, _frames[i].globalDescriptor,&cameraInfo,0);
+
+		// VkWriteDescriptorSet sceneWrite = vkinit::write_descriptor_buffer(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, _frames[i].globalDescriptor, &sceneInfo, 1);
+		VkWriteDescriptorSet sceneWrite = vkinit::write_descriptor_buffer(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, _frames[i].globalDescriptor, &sceneInfo, 1);
+
+		VkWriteDescriptorSet setWrites[] = { cameraWrite, sceneWrite };
+
+		vkUpdateDescriptorSets(_device, 1, setWrites, 0, nullptr);
 	}
 
 	// add buffers to deletion queues
 	_mainDeletionQueue.push_function([&]()
 	{
-		// vmaDestroyBuffer(_allocator, _sceneParameterBuffer._buffer, _sceneParameterBuffer._allocation);
+		vmaDestroyBuffer(_allocator, _sceneParameterBuffer._buffer, _sceneParameterBuffer._allocation);
 		// vkDestroyDescriptorSetLayout(_device, _objectSetLayout, nullptr);
 		vkDestroyDescriptorSetLayout(_device, _globalSetLayout, nullptr);
 		vkDestroyDescriptorPool(_device, _descriptorPool, nullptr);
@@ -1195,3 +1211,44 @@ void VulkanEngine::init_descriptors()
 		}
 	});
 }
+
+
+size_t VulkanEngine::pad_uniform_buffer_size(size_t originalSize)
+{
+	// Calculate required alignment based on minimum device offset alignment
+	size_t minUboAlignment = _gpuProperties.limits.minUniformBufferOffsetAlignment;
+	size_t alignedSize = originalSize;
+	if (minUboAlignment > 0) {
+		alignedSize = (alignedSize + minUboAlignment - 1) & ~(minUboAlignment - 1);
+	}
+	return alignedSize;
+}
+
+
+VkDescriptorSetLayoutBinding vkinit::descriptorset_layout_binding(VkDescriptorType type, VkShaderStageFlags stageFlags, uint32_t binding)
+{
+	VkDescriptorSetLayoutBinding setbind = {};
+	setbind.binding = binding;
+	setbind.descriptorCount = 1;
+	setbind.descriptorType = type;
+	setbind.pImmutableSamplers = nullptr;
+	setbind.stageFlags = stageFlags;
+
+	return setbind;
+}
+VkWriteDescriptorSet vkinit::write_descriptor_buffer(VkDescriptorType type, VkDescriptorSet dstSet, VkDescriptorBufferInfo* bufferInfo , uint32_t binding)
+{
+	VkWriteDescriptorSet write = {};
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.pNext = nullptr;
+
+	write.dstBinding = binding;
+	write.dstSet = dstSet;
+	write.descriptorCount = 1;
+	write.descriptorType = type;
+	write.pBufferInfo = bufferInfo;
+
+	return write;
+}
+
+
