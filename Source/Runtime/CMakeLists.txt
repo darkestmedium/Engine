@@ -18,6 +18,8 @@ add_executable(Engine
 	vk_initializers.h
 	vk_mesh.cpp
 	vk_mesh.h
+	vk_textures.h
+	vk_textures.cpp
 	vk_types.h
 	Camera.h
 	Camera.cpp

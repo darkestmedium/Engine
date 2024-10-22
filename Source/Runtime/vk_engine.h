@@ -62,8 +62,16 @@ struct MeshPushConstants
 
 struct Material
 {
+	VkDescriptorSet textureSet{VK_NULL_HANDLE};
 	VkPipeline pipeline;
 	VkPipelineLayout pipelineLayout;
+};
+
+
+struct Texture
+{
+	AllocatedImage image;
+	VkImageView imageView;
 };
 
 
@@ -123,6 +131,14 @@ struct FrameData
 
 	AllocatedBuffer objectBuffer;
 	VkDescriptorSet objectDescriptor;
+};
+
+
+struct UploadContext
+{
+	VkFence _uploadFence;
+	VkCommandPool _commandPool;
+	VkCommandBuffer _commandBuffer;
 };
 
 
@@ -217,6 +233,15 @@ public:
 	//run main loop
 	void run();
 
+	UploadContext _uploadContext;
+
+	AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+	void immediate_submit(std::function<void(VkCommandBuffer cmd)> &&function);
+
+	//texture hashmap
+	std::unordered_map<std::string, Texture> _loadedTextures;
+	void load_images();
+
 private:
 
 	void init_vulkan();
@@ -235,7 +260,7 @@ private:
 
 	void init_pipelines();
 
-	// loads a shader module from a spir-v file. Returns false if it errors
+	// Loads a shader module from a spir-v file. Returns false if it errors
 	bool load_shader_module(const char* filePath, VkShaderModule *outShaderModule);
 
 	void load_meshes();
@@ -266,7 +291,6 @@ private:
 
 	void init_scene();
 
-	AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
 
 	VkDescriptorSetLayout _globalSetLayout;
 	VkDescriptorSetLayout _objectSetLayout;
