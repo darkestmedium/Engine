@@ -121,6 +121,18 @@
 		"version": "2.0.0",
 		"tasks": 
 		[
+			{
+				"label": "Configure CMake",
+				"type": "shell",
+				"command": "cmake",
+				"args": [
+					"-S", "${workspaceFolder}",
+					"-B", "${workspaceFolder}/Build",
+					"-DCMAKE_BUILD_TYPE=${input:buildConfig}"
+				],
+				"group": {"kind": "build"},
+				"detail": "CMake configure task."
+			},
 			// Build
 			{
 				"label": "Build All",
@@ -170,7 +182,15 @@
 				"dependsOn": ["Build All", "Run Engine"],
 				"group": {"kind": "build"},
 				"detail": "Builds and runs the executables. ('Build All', 'Run Engine')",
-			}
+			},
+			// Configure,Build and run compound task
+			{
+				"label": "Configure, Build and Run",
+				"dependsOrder": "sequence",
+				"dependsOn": ["Configure CMake", "Build All", "Run Engine"],
+				"group": {"kind": "build"},
+				"detail": "Builds and runs the executables. ('Configure CMake', 'Build All', 'Run Engine')",
+			},
 		],
 
 		// Inputs

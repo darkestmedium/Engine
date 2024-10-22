@@ -42,7 +42,7 @@ struct DeletionQueue
 
 	void flush()
 	{
-		// reverse iterate the deletion queue to execute all the functions
+		// Reverse iterate the deletion queue to execute all the functions
 		for (auto it = deletors.rbegin(); it != deletors.rend(); it++)
 		{
 			(*it)(); // call functors
@@ -104,6 +104,12 @@ struct GPUSceneData
 };
 
 
+struct GPUObjectData
+{
+	glm::mat4 modelMatrix;
+};
+
+
 struct FrameData
 {
 	VkSemaphore _presentSemaphore, _renderSemaphore;
@@ -114,6 +120,9 @@ struct FrameData
 
 	AllocatedBuffer cameraBuffer;
 	VkDescriptorSet globalDescriptor;
+
+	AllocatedBuffer objectBuffer;
+	VkDescriptorSet objectDescriptor;
 };
 
 
@@ -260,10 +269,11 @@ private:
 	AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
 
 	VkDescriptorSetLayout _globalSetLayout;
+	VkDescriptorSetLayout _objectSetLayout;
+
 	VkDescriptorPool _descriptorPool;
 
 	VkPhysicalDeviceProperties _gpuProperties;
-
 
 	GPUSceneData _sceneParameters;
 	AllocatedBuffer _sceneParameterBuffer;
