@@ -254,7 +254,7 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject *first, int co
 	{
 		.view = mViewUniforms.view,
 		.proj = mViewUniforms.proj,
-		.viewproj = mViewUniforms.proj * camData.view,
+		.viewproj = mViewUniforms.proj * mViewUniforms.view,
 	};
 
 	//and copy it to the buffer
@@ -309,20 +309,17 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject *first, int co
 
 			uint32_t uniform_offset = pad_uniform_buffer_size(sizeof(GPUSceneData)) * frameIndex;
 			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 0, 1, &get_current_frame().globalDescriptor, 1, &uniform_offset);
-		
 			//object data descriptor
 			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 1, 1, &get_current_frame().objectDescriptor, 0, nullptr);
 		}
 
-		glm::mat4 model = object.transformMatrix;
-		// Final render matrix, that we are calculating on the cpu.
-		glm::mat4 mesh_matrix = model;
-
-		MeshPushConstants constants;
-		constants.render_matrix = mesh_matrix;
-
-		// Upload the mesh to the GPU via push constants.
+		// Push Mesh Constants
+		MeshPushConstants constants
+		{
+			.render_matrix = object.transformMatrix,
+		};
 		vkCmdPushConstants(cmd, object.material->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
+
 
 		// Only bind the mesh if it's a different one from last bind.
 		if (object.mesh != lastMesh)
@@ -1043,7 +1040,6 @@ void VulkanEngine::update_scene()
 	mViewUniforms.pos = mMainCamera.GetPosition();
 	mViewUniforms.nearPoint = glm::vec3(0.0f, 0.0f, mMainCamera.GetNearClip()); // near plane point
 	mViewUniforms.farPoint = glm::vec3(0.0f, 0.0f, mMainCamera.GetFarClip());  // far plane point
-
 }
 
 
