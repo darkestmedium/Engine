@@ -12,10 +12,11 @@ bool vkutil::load_image_from_file(VulkanEngine& engine, const char* file, Alloca
 {
 	int texWidth, texHeight, texChannels;
 
-	stbi_uc* pixels = stbi_load(file, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);	
+	stbi_uc *pixels = stbi_load(file, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);	
 
-	if (!pixels) {
-		std::cout << "Failed to load texture file " << file << std::endl;
+	if (!pixels)
+	{
+		LOG_ERROR("Failed to load texture file {}", file);
 		return false;
 	}
 	
@@ -107,7 +108,7 @@ bool vkutil::load_image_from_file(VulkanEngine& engine, const char* file, Alloca
 
 	vmaDestroyBuffer(engine._allocator, stagingBuffer._buffer, stagingBuffer._allocation);
 
-	std::cout << "Texture loaded succesfully " << file << std::endl;
+	LOG_SUCCESS("Texture loaded succesfully {}", file);
 
 	outImage = newImage;
 	return true;

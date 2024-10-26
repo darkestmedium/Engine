@@ -10,6 +10,7 @@ endif()
 
 # Add source to this project's executable.
 add_executable(Engine 
+	Logger.h
 	ProgramConfig.h
 	main.cpp
 	vk_engine.cpp

@@ -6,8 +6,7 @@
 #include <vk_types.h>
 #include <vk_engine.h>
 
-namespace vkutil {
-
-	bool load_image_from_file(VulkanEngine& engine, const char* file, AllocatedImage& outImage);
-
+namespace vkutil
+{
+	bool load_image_from_file(VulkanEngine &engine, const char *file, AllocatedImage &outImage);
 }

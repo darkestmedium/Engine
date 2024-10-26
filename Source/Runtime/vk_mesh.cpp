@@ -68,7 +68,8 @@ bool Mesh::load_from_obj(const char* filename)
 		nullptr);
 	//make sure to output the warnings to the console, in case there are issues with the file
 	if (!warn.empty()) {
-		std::cout << "WARN: " << warn << std::endl;
+		LOG_WARNING(warn)
+		// std::cout << "WARN: " << warn << std::endl;
 	}
 	//if we have any error, print it to the console, and break the mesh loading. 
 	//This happens if the file cant be found or is malformed

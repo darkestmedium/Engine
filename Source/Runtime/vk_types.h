@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "Logger.h"
+
 // STD
 #include <deque>
 #include <functional>

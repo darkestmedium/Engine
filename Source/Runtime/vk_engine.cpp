@@ -105,26 +105,40 @@ void VulkanEngine::Deinitialize()
 		vkDeviceWaitIdle(_device);
 
 		_mainDeletionQueue.flush();
-		fmt::println("{}: Deletion queue was flushed.", GetName());
-	
+		#ifdef DEBUG
+		LOG_INFO("{}: Deletion queue was flushed.", GetName());
+		#endif
+
 	  vmaDestroyAllocator(_allocator);
-		fmt::println("{}: Vulkan Memory Allocator was destroyed.", GetName());
+		#ifdef DEBUG
+		LOG_INFO("{}: Vulkan Memory Allocator was destroyed.", GetName());
+		#endif
 
 		vkDestroyDevice(_device, nullptr);
-		fmt::println("{}: Vulkan Logical Device was destroyed.", GetName());
-		
+		#ifdef DEBUG
+		LOG_INFO("{}: Vulkan Logical Device was destroyed.", GetName());
+		#endif
+	
 		vkDestroySurfaceKHR(_instance, _surface, nullptr);
-		fmt::println("{}: Vulkan Surface was destroyed.", GetName());
+		#ifdef DEBUG
+		LOG_INFO("{}: Vulkan Surface was destroyed.", GetName());
+		#endif
 
 		vkb::destroy_debug_utils_messenger(_instance, _debug_messenger);
 
 		vkDestroyInstance(_instance, nullptr);
-		fmt::println("{}: Vulkan Instance was destroyed.", GetName());
+		#ifdef DEBUG
+		LOG_INFO("{}: Vulkan Instance was destroyed.", GetName());
+		#endif
 
 		SDL_DestroyWindow(_window);
-		fmt::println("{}: SDL Windows was destroyed.", GetName());
+		#ifdef DEBUG
+		LOG_INFO("{}: SDL Window was destroyed.", GetName());
+		#endif
 
-		fmt::println("{}: Exiting application.", GetName());
+		#ifdef DEBUG
+		LOG_INFO("{}: Exiting application.", GetName());
+		#endif
 	}
 }
 
@@ -364,12 +378,12 @@ void VulkanEngine::init_vulkan()
 	if (volkInitialize() != VK_SUCCESS)
 	{
 		#ifdef DEBUG
-    fmt::println("{}: WARNING! Volk failed to load.", GetName());
+    LOG_FATAL("{}: WARNING! Volk failed to load.", GetName());
 		#endif
     return;
   }
 	#ifdef DEBUG
-  fmt::println("{}: Volk loaded successfully.", GetName());
+	LOG_SUCCESS("{}: Volk loaded successfully.", GetName())
 	#endif
 
 
@@ -414,10 +428,12 @@ void VulkanEngine::init_vulkan()
 
 	// vkb::Device vkbDevice = deviceBuilder.build().value();
 
-	_gpuProperties = vkbDevice.physical_device.properties;
-	fmt::println("{}: The GPU has a minimum buffer alignment of {}", GetName(), _gpuProperties.limits.minUniformBufferOffsetAlignment);
+	// _gpuProperties = vkbDevice.physical_device.properties;
+	// fmt::println("{}: The GPU has a minimum buffer alignment of {}", GetName(), _gpuProperties.limits.minUniformBufferOffsetAlignment);
 
-	fmt::println("{}: Logical device created successfully.", GetName());
+	#ifdef DEBUG
+	LOG_SUCCESS("{}: Logical device created successfully.", GetName());
+	#endif
 
 	// Get the VkDevice handle used in the rest of a vulkan application
 	_device = vkbDevice.device;
@@ -453,15 +469,16 @@ void VulkanEngine::init_vulkan()
 
   if (vmaCreateAllocator(&allocatorInfo, &_allocator) != VK_SUCCESS)
 	{
-    fmt::println("{}: ERROR! Failed to create vulkan memory allocator.", GetName());
+		#ifdef DEBUG
+    LOG_FATAL("{}: ERROR! Failed to create vulkan memory allocator.", GetName());
+		#endif
     return;
   };
 
-  fmt::println("{}: Vulkan Memory Allocator created successfully.", GetName());
+	#ifdef DEBUG
+  LOG_SUCCESS("{}: Vulkan Memory Allocator created successfully.", GetName());
+	#endif
 
-	// _mainDeletionQueue.push_function([&]() {
-	// 	vmaDestroyAllocator(_allocator);
-	// });
 }
 
 
@@ -714,48 +731,66 @@ void VulkanEngine::init_pipelines()
 	VkShaderModule texturedMeshShader;
 	if (!load_shader_module("./Shaders/textured_lit.frag.spv", &texturedMeshShader))
 	{
-		fmt::println("{}: Error when building the textured mesh shader", GetName());
+		#ifdef DEBUG
+		LOG_FATAL("{}: Error when building the textured mesh shader", GetName());
+		#endif
 	}
-	fmt::println("{}: Textured mesh shader successsfully loaded.", GetName());
+	#ifdef DEBUG
+	LOG_SUCCESS("{}: Textured mesh shader successsfully loaded.", GetName());
+	#endif
 
 	VkShaderModule coloredMeshShader;
 	if (!load_shader_module("./Shaders/default_lit.frag.spv", &coloredMeshShader))
 	{
-		fmt::println("{}: Error when building the colored mesh fragment shader module.", GetName());
+		#ifdef DEBUG
+		LOG_FATAL("{}: Error when building the colored mesh fragment shader module.", GetName());
+		#endif
 	}
-	fmt::println("{}: Colored mesh fragment shader succesfully loaded.", GetName());
+	#ifdef DEBUG
+	LOG_SUCCESS("{}: Colored mesh fragment shader succesfully loaded.", GetName());
+	#endif
 
 	VkShaderModule meshVertShader;
 	if (!load_shader_module("./Shaders/tri_mesh_ssbo.vert.spv", &meshVertShader))
 	{
-		fmt::println("{}: Error when building the tri mesh ssbo vertex shader module.", GetName());
+		#ifdef DEBUG
+		LOG_FATAL("{}: Error when building the tri mesh ssbo vertex shader module.", GetName());
+		#endif
 	}
-	fmt::println("{}: Tri mesh ssbo vertex shader succesfully loaded.", GetName());
+	#ifdef DEBUG
+	LOG_SUCCESS("{}: Tri mesh ssbo vertex shader succesfully loaded.", GetName());
+	#endif
 
 	// GRID PIPELINE
 	VkShaderModule gridFragShader;
 	if (!load_shader_module("./Shaders/Grid.frag.spv", &gridFragShader))
 	{
-		fmt::println("{}: Error when building the grid fragment shader module.", GetName());
+		#ifdef DEBUG
+		LOG_FATAL("{}: Error when building the grid fragment shader module.", GetName());
+		#endif
 	}
-	fmt::println("{}: Grid fragment shader succesfully loaded.", GetName());
+	#ifdef DEBUG
+	LOG_SUCCESS("{}: Grid fragment shader succesfully loaded.", GetName());
+	#endif
 
 	VkShaderModule gridVertShader;
 	if (!load_shader_module("./Shaders/Grid.vert.spv", &gridVertShader))
 	{
-		fmt::println("{}: Error when building the grid vertex shader module.", GetName());
+		#ifdef DEBUG
+		LOG_FATAL("{}: Error when building the grid vertex shader module.", GetName());
+		#endif
 	}
-	fmt::println("{}: Grid vertex shader succesfully loaded.", GetName());
+	#ifdef DEBUG
+	LOG_SUCCESS("{}: Grid vertex shader succesfully loaded.", GetName());
+	#endif
 
 	
 	//build the stage-create-info for both vertex and fragment stages. This lets the pipeline know the shader modules per stage
 	PipelineBuilder pipelineBuilder;
 
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader));
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader));
 
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, coloredMeshShader));
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, coloredMeshShader));
 
 
 	//we start from just the default empty pipeline layout info
@@ -875,8 +910,11 @@ void VulkanEngine::init_pipelines()
 	// Hook the push constants layout
 	pipelineBuilder._pipelineLayout = mGridPipelineLayout;
 	mGridPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
-	fmt::println("{}: Grid pipeline was built successfully.", GetName());
 
+
+	#ifdef DEBUG
+	LOG_SUCCESS("{}: Grid pipeline was built successfully.", GetName());
+	#endif
 
 
 

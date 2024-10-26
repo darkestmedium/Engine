@@ -5,6 +5,7 @@
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 
 
+
 #include "vk_engine.h"
 #include "ProgramConfig.h"
 
@@ -12,30 +13,33 @@
 #include <filesystem>
 
 
+const char *GetName()
+{
+	return "Main";
+}
 
 
 void PrintPlatformStr(void)
 {
 	#if defined(__linux__)
-		fmt::println("Main: __linux__ is defined.");
+		LOG_INFO("{}: __linux__ is defined.", GetName());
 	#elif defined(_WIN32)
-		fmt::println("Main: _WIN32 is defined.");
+		LOG_INFO("{}: _WIN32 is defined.", GetName());
 	#elif defined(__APPLE__)
-		fmt::println("Main: __APPLE__ is defined.");
+		LOG_INFO("{}: __APPLE__ is defined.", GetName());
 	#else
-		fmt::println("Main: Unknown platform.");
+		LOG_INFO("{}: Unknown platform.", GetName());
 	#endif
 }
 
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
 	ProgramConfig args = argparse::parse<ProgramConfig>(argc, argv);
 
 	if (args.help)
 	{
 		args.DisplayHelp();
-		
 		return 0;
 	}
 
@@ -44,7 +48,8 @@ int main(int argc, char* argv[])
 		#define DEBUG
 		args.print();  // Prints all variables
 		PrintPlatformStr();
-		fmt::println("Main: Current working directory: {}", std::filesystem::current_path().c_str());
+
+		LOG_INFO("{}: Current working directory: {}", GetName(), std::filesystem::current_path().c_str())
 	}
 
 	VulkanEngine engine(args);
