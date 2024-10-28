@@ -47,7 +47,7 @@ using namespace std;
 
 
 
-const char *VulkanEngine::GetName() 
+const char *VulkanEngine::GetName() const
 {
 	return "VulkanEngine";
 }
@@ -179,8 +179,8 @@ void VulkanEngine::draw()
 	VkClearValue depthClear;
 	depthClear.depthStencil.depth = 1.f;
 
-	//start the main renderpass. 
-	//We will use the clear color from above, and the framebuffer of the index the swapchain gave us
+	// Start the main renderpass. 
+	// We will use the clear color from above, and the framebuffer of the index the swapchain gave us
 	VkRenderPassBeginInfo rpInfo = vkinit::renderpass_begin_info(_renderPass, _windowExtent, _framebuffers[swapchainImageIndex]);
 
 	// Connect clear values
@@ -199,7 +199,9 @@ void VulkanEngine::draw()
 	if (_displayGrid == 0)
 	{
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipeline);
-		vkCmdPushConstants(cmd, mGridPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewUniforms), &mViewUniforms);
+		// vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipelineLayout, 0, 1, &get_current_frame().globalDescriptor, 1, nullptr);
+
+		vkCmdPushConstants(cmd, mGridPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUCameraData), &mCameraData);
 		vkCmdDraw(cmd, 6, 1, 0, 0);
 	}
 
@@ -255,25 +257,11 @@ void VulkanEngine::draw()
 
 void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject *first, int count)
 {
-	// Fill a GPU camera data struct
-	GPUCameraData camData
-	{
-		.view = mViewUniforms.view,
-		.proj = mViewUniforms.proj,
-		.viewproj = mViewUniforms.proj * mViewUniforms.view,
-	};
-
-	// And copy it to the buffer
-	void *data;
-	vmaMapMemory(_allocator, get_current_frame().cameraBuffer._allocation, &data);
-	memcpy(data, &camData, sizeof(GPUCameraData));
-	vmaUnmapMemory(_allocator, get_current_frame().cameraBuffer._allocation);
-
 	float framed = (_frameNumber / 120.f);
 	_sceneParameters.ambientColor = {sin(framed), 0, cos(framed), 1};
 
 	char *sceneData;
-	vmaMapMemory(_allocator, _sceneParameterBuffer._allocation , (void**)&sceneData);
+	vmaMapMemory(_allocator, _sceneParameterBuffer._allocation, (void**)&sceneData);
 	int frameIndex = _frameNumber % FRAME_OVERLAP;
 	sceneData += pad_uniform_buffer_size(sizeof(GPUSceneData)) * frameIndex;
 	memcpy(sceneData, &_sceneParameters, sizeof(GPUSceneData));
@@ -312,13 +300,6 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject *first, int co
 				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 2, 1, &object.material->textureSet, 0, nullptr);
 			}
 		}
-
-		// Push Mesh Constants
-		MeshPushConstants constants
-		{
-			.render_matrix = object.transformMatrix,
-		};
-		vkCmdPushConstants(cmd, object.material->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
 
 		// Only bind the mesh if it's a different one from last bind.
 		if (object.mesh != lastMesh)
@@ -796,18 +777,6 @@ void VulkanEngine::init_pipelines()
 	//we start from just the default empty pipeline layout info
 	VkPipelineLayoutCreateInfo mesh_pipeline_layout_info = vkinit::pipeline_layout_create_info();
 
-	//setup push constants
-	VkPushConstantRange push_constant;
-	//offset 0
-	push_constant.offset = 0;
-	//size of a MeshPushConstant struct
-	push_constant.size = sizeof(MeshPushConstants);
-	//for the vertex shader
-	push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-	mesh_pipeline_layout_info.pPushConstantRanges = &push_constant;
-	mesh_pipeline_layout_info.pushConstantRangeCount = 1;
-
 	VkDescriptorSetLayout setLayouts[] = { _globalSetLayout, _objectSetLayout };
 
 	mesh_pipeline_layout_info.setLayoutCount = 2;
@@ -820,7 +789,7 @@ void VulkanEngine::init_pipelines()
 	//we start from  the normal mesh layout
 	VkPipelineLayoutCreateInfo textured_pipeline_layout_info = mesh_pipeline_layout_info;
 		
-	VkDescriptorSetLayout texturedSetLayouts[] = { _globalSetLayout, _objectSetLayout,_singleTextureSetLayout };
+	VkDescriptorSetLayout texturedSetLayouts[] = { _globalSetLayout, _objectSetLayout, _singleTextureSetLayout };
 
 	textured_pipeline_layout_info.setLayoutCount = 3;
 	textured_pipeline_layout_info.pSetLayouts = texturedSetLayouts;
@@ -901,12 +870,21 @@ void VulkanEngine::init_pipelines()
 	{
 		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
 		.offset = 0,
-		.size = sizeof(ViewUniforms),
+		.size = sizeof(GPUCameraData),
 	};
 	VkPipelineLayoutCreateInfo grid_pipeline_layout_info = vkinit::pipeline_layout_create_info();
 	grid_pipeline_layout_info.pPushConstantRanges = &view_constant;
 	grid_pipeline_layout_info.pushConstantRangeCount = 1;
+
+	VkDescriptorSetLayout gridSetLayout[] = { _globalSetLayout, _objectSetLayout };
+
+	grid_pipeline_layout_info.setLayoutCount = 2;
+	grid_pipeline_layout_info.pSetLayouts = gridSetLayout;
+
 	VK_CHECK(vkCreatePipelineLayout(_device, &grid_pipeline_layout_info, nullptr, &mGridPipelineLayout));
+
+
+
 	// Hook the push constants layout
 	pipelineBuilder._pipelineLayout = mGridPipelineLayout;
 	mGridPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
@@ -1170,11 +1148,18 @@ void VulkanEngine::update_scene()
 
 	projection[1][1] *= -1;
 
-	mViewUniforms.view = mMainCamera.GetViewMatrix();
-	mViewUniforms.proj = projection;
-	mViewUniforms.pos = mMainCamera.GetPosition();
-	mViewUniforms.nearPoint = glm::vec3(0.0f, 0.0f, mMainCamera.GetNearClip()); // near plane point
-	mViewUniforms.farPoint = glm::vec3(0.0f, 0.0f, mMainCamera.GetFarClip());  // far plane point
+	mCameraData.view = mMainCamera.GetViewMatrix();
+	mCameraData.proj = projection;
+	mCameraData.viewproj = mCameraData.proj * mCameraData.view;
+ 	mCameraData.nearPoint = glm::vec3(0.0f, 0.0f, mMainCamera.GetNearClip()); // near plane point
+	mCameraData.farPoint = glm::vec3(0.0f, 0.0f, mMainCamera.GetFarClip());  // far plane point
+
+	// And copy it to the buffer
+	void *data;
+	vmaMapMemory(_allocator, get_current_frame().cameraBuffer._allocation, &data);
+	memcpy(data, &mCameraData, sizeof(GPUCameraData));
+	vmaUnmapMemory(_allocator, get_current_frame().cameraBuffer._allocation);
+
 }
 
 
@@ -1252,12 +1237,14 @@ void VulkanEngine::init_scene()
 
 	Material *texturedMat =	get_material("texturedmesh");
 
-	VkDescriptorSetAllocateInfo allocInfo = {};
-	allocInfo.pNext = nullptr;
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = _descriptorPool;
-	allocInfo.descriptorSetCount = 1;
-	allocInfo.pSetLayouts = &_singleTextureSetLayout;
+	VkDescriptorSetAllocateInfo allocInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+		.pNext = nullptr,
+		.descriptorPool = _descriptorPool,
+		.descriptorSetCount = 1,
+		.pSetLayouts = &_singleTextureSetLayout,
+	};
 
 	vkAllocateDescriptorSets(_device, &allocInfo, &texturedMat->textureSet);
 
@@ -1331,7 +1318,7 @@ void VulkanEngine::init_descriptors()
 
 	vkCreateDescriptorPool(_device, &pool_info, nullptr, &_descriptorPool);
 
-	VkDescriptorSetLayoutBinding cameraBind = vkinit::descriptorset_layout_binding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,VK_SHADER_STAGE_VERTEX_BIT,0);
+	VkDescriptorSetLayoutBinding cameraBind = vkinit::descriptorset_layout_binding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0);
 	VkDescriptorSetLayoutBinding sceneBind = vkinit::descriptorset_layout_binding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 1);
 	
 	VkDescriptorSetLayoutBinding bindings[] = {cameraBind, sceneBind};

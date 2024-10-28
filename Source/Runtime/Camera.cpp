@@ -1,6 +1,10 @@
 #include "Camera.h"
 
 
+const char *Camera::GetName() const
+{
+	return "Camera";
+}
 
 
 glm::mat4 Camera::GetViewMatrix() const

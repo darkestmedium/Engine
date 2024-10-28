@@ -10,10 +10,13 @@ layout (location = 1) out vec2 texCoord;
 
 
 layout(set = 0, binding = 0) uniform  CameraBuffer
-{   
+{
 	mat4 view;
 	mat4 proj;
-	mat4 viewproj; 
+	mat4 viewproj;
+	vec3 pos;
+	vec3 nearPoint;
+	vec3 farPoint;
 } cameraData;
 
 
@@ -30,21 +33,12 @@ layout(std140, set = 1, binding = 0) readonly buffer ObjectBuffer
 } objectBuffer;
 
 
-
-// Push constants block
-layout(push_constant) uniform constants
-{
-	vec4 data;
-	mat4 render_matrix;
-} PushConstants;
-
 void main() 
 {
 	// Apply the render_matrix from push constants
-	mat4 modelMatrix = PushConstants.render_matrix * objectBuffer.objects[gl_BaseInstance].model;
+	// mat4 modelMatrix = PushConstants.render_matrix * objectBuffer.objects[gl_BaseInstance].model;
 
-
-	// mat4 modelMatrix = objectBuffer.objects[gl_BaseInstance].model;
+	mat4 modelMatrix = objectBuffer.objects[gl_BaseInstance].model;
 	mat4 transformMatrix = (cameraData.viewproj * modelMatrix);
 	gl_Position = transformMatrix * vec4(vPosition, 1.0f);
 	outColor = vColor;

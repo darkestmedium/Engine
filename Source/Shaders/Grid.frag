@@ -6,8 +6,8 @@ layout(push_constant) uniform ViewUniforms
 {
 	mat4 view;
 	mat4 proj;
+	mat4 viewproj;
 	vec3 pos;
-
 	vec3 nearPoint;
 	vec3 farPoint;
 } view;

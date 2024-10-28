@@ -27,6 +27,7 @@ public:
 	~Camera() {};
  
 	// Getters
+	const char *GetName() const;
 	glm::mat4 GetViewMatrix() const;
 	glm::mat4 GetRotationMatrix() const;
 	glm::vec3 GetPosition() const;

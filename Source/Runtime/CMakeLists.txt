@@ -7,7 +7,6 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 	add_compile_options(/wd4458)  # Example MSVC warning code
 endif()
 
-
 # Add source to this project's executable.
 add_executable(Engine 
 	Logger.h

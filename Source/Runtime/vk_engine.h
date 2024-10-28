@@ -54,13 +54,6 @@ struct DeletionQueue
 };
 
 
-struct MeshPushConstants
-{
-	glm::vec4 data;
-	glm::mat4 render_matrix;
-};
-
-
 struct Material
 {
 	VkDescriptorSet textureSet{VK_NULL_HANDLE};
@@ -84,22 +77,14 @@ struct RenderObject
 };
 
 
-struct ViewUniforms
-{
-	glm::mat4 view;
-	glm::mat4 proj;
-	glm::vec3 pos;
-
-	glm::vec3 nearPoint;
-	glm::vec3 farPoint;
-};
-
-
 struct GPUCameraData
 {
 	glm::mat4 view;
 	glm::mat4 proj;
 	glm::mat4 viewproj;
+	glm::vec3 pos;
+	glm::vec3 nearPoint;
+	glm::vec3 farPoint;
 };
 
 
@@ -176,7 +161,7 @@ public:
 
 	// CAMERA
 	Camera mMainCamera;
-	ViewUniforms mViewUniforms;
+	GPUCameraData mCameraData;
 
 	VkSemaphore _presentSemaphore, _renderSemaphore;
 	VkFence _renderFence;
@@ -220,7 +205,7 @@ public:
 	//getter for the frame we are rendering to right now.
 	FrameData &get_current_frame();
 
-	const char *GetName();
+	const char *GetName() const;
 
 	//initializes everything in the engine
 	void init();
