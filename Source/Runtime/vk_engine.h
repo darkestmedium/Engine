@@ -90,10 +90,10 @@ struct GPUCameraData
 
 struct GPUSceneData
 {
-	glm::vec4 fogColor; // w is for exponent
-	glm::vec4 fogDistances; //x for min, y for max, zw unused.
+	glm::vec4 fogColor;  // w is for exponent
+	glm::vec4 fogDistances;  // x for min, y for max, zw unused.
 	glm::vec4 ambientColor;
-	glm::vec4 sunlightDirection; //w for sun power
+	glm::vec4 sunlightDirection;  //w for sun power
 	glm::vec4 sunlightColor;
 };
 
@@ -138,6 +138,7 @@ public:
 	// Constructors
 	VulkanEngine(ProgramConfig &args)
 		: mArgs(args)
+		, mFrameNumber(0)
 		, bIsInitialized(false)
 	{};
 
@@ -145,9 +146,8 @@ public:
 	~VulkanEngine() {Deinitialize();};
 		
 	ProgramConfig &mArgs;
-
 	bool bIsInitialized;
-	int _frameNumber{ 0 };
+	int mFrameNumber;
 	int _displayGrid{ 0 };
 
 	VkExtent2D _windowExtent;
@@ -184,9 +184,6 @@ public:
 	// Pipelines
 	VkPipelineLayout mGridPipelineLayout;
 	VkPipeline mGridPipeline;
-
-	// VkPipelineLayout _meshPipelineLayout;
-	// VkPipeline _meshPipeline;
 
 	Mesh _monkeyMesh;
 
@@ -246,7 +243,7 @@ public:
 	size_t pad_uniform_buffer_size(size_t originalSize);
 
 	//create material and add it to the map
-	Material *create_material(VkPipeline pipeline, VkPipelineLayout layout,const std::string &name);
+	Material *create_material(VkPipeline pipeline, VkPipelineLayout layout, const std::string &name);
 	//returns nullptr if it can't be found
 	Material *get_material(const std::string &name);
 	//returns nullptr if it can't be found
@@ -271,8 +268,7 @@ private:
 
 	void init_pipelines();
 
-	// Loads a shader module from a spir-v file. Returns false if it errors
-	bool load_shader_module(const char* filePath, VkShaderModule *outShaderModule);
+	bool load_shader_module(const char *filePath, VkShaderModule *outShaderModule);
 
 	void load_meshes();
 
@@ -280,12 +276,10 @@ private:
 
 	void update_scene();
 
-
-	// Our draw function
-	void draw_objects(VkCommandBuffer cmd, RenderObject *first, int count);
-
 	void init_scene();
 
+	void draw_objects(VkCommandBuffer &cmd, RenderObject *first, int count);
+	void DrawViewportOverlays(VkCommandBuffer &cmd);
 };
 
 

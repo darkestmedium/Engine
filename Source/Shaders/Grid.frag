@@ -1,8 +1,7 @@
 //glsl version 4.5
 #version 460
 
-// Push constants block.
-layout(push_constant) uniform ViewUniforms
+layout(set = 0, binding = 0) uniform  CameraBuffer
 {
 	mat4 view;
 	mat4 proj;
@@ -10,7 +9,8 @@ layout(push_constant) uniform ViewUniforms
 	vec3 pos;
 	vec3 nearPoint;
 	vec3 farPoint;
-} view;
+} cameraData;
+
 
 // layout(location = 1) in vec3 nearPoint;
 // layout(location = 2) in vec3 farPoint;
@@ -42,8 +42,12 @@ vec4 grid(vec3 fragPos3D, float scale)
 
 void main()
 {
-	float t = -view.nearPoint.y / (view.farPoint.y - view.nearPoint.y);
-	vec3 fragPos3D = view.nearPoint + t * (view.farPoint - view.nearPoint);
+	// float t = -view.nearPoint.y / (view.farPoint.y - view.nearPoint.y);
+	// vec3 fragPos3D = view.nearPoint + t * (view.farPoint - view.nearPoint);
+	// outFragColor = grid(fragPos3D, 10) * float(t > 0);
+
+	float t = -cameraData.nearPoint.y / (cameraData.farPoint.y - cameraData.nearPoint.y);
+	vec3 fragPos3D = cameraData.nearPoint + t * (cameraData.farPoint - cameraData.nearPoint);
 	// outFragColor = grid(fragPos3D, 10) * float(t > 0);
 
 	outFragColor = vec4(1.0, 0.0, 0.0, 1.0 * float(t > 0)); // opacity = 1 when t > 0, opacity = 0 otherwise

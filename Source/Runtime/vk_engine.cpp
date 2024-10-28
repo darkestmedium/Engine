@@ -47,12 +47,11 @@ using namespace std;
 
 
 
+
 const char *VulkanEngine::GetName() const
 {
 	return "VulkanEngine";
 }
-
-
 
 
 void VulkanEngine::init()
@@ -172,7 +171,7 @@ void VulkanEngine::draw()
 
 	//make a clear-color from frame number. This will flash with a 120 frame period.
 	VkClearValue clearValue;
-	float flash = abs(sin(_frameNumber / 120.0f));
+	float flash = abs(sin(mFrameNumber / 120.0f));
 	clearValue.color = {{0.0f, 0.0f, flash, 1.0f}};
 
 	//clear depth at 1
@@ -194,16 +193,7 @@ void VulkanEngine::draw()
 
 	draw_objects(cmd, _renderables.data(), _renderables.size());
 
-	// Draw grid
-	// once we start adding rendering commands, they will go here
-	if (_displayGrid == 0)
-	{
-		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipeline);
-		// vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipelineLayout, 0, 1, &get_current_frame().globalDescriptor, 1, nullptr);
-
-		vkCmdPushConstants(cmd, mGridPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUCameraData), &mCameraData);
-		vkCmdDraw(cmd, 6, 1, 0, 0);
-	}
+	DrawViewportOverlays(cmd);
 
 	// Finalize the render pass
 	vkCmdEndRenderPass(cmd);
@@ -248,21 +238,21 @@ void VulkanEngine::draw()
 	VK_CHECK(vkQueuePresentKHR(_graphicsQueue, &presentInfo));
 
 	//increase the number of frames drawn
-	_frameNumber++;
+	mFrameNumber++;
 }
 
 
 
 
 
-void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject *first, int count)
+void VulkanEngine::draw_objects(VkCommandBuffer &cmd, RenderObject *first, int count)
 {
-	float framed = (_frameNumber / 120.f);
+	float framed = (mFrameNumber / 120.f);
 	_sceneParameters.ambientColor = {sin(framed), 0, cos(framed), 1};
 
 	char *sceneData;
 	vmaMapMemory(_allocator, _sceneParameterBuffer._allocation, (void**)&sceneData);
-	int frameIndex = _frameNumber % FRAME_OVERLAP;
+	int frameIndex = mFrameNumber % FRAME_OVERLAP;
 	sceneData += pad_uniform_buffer_size(sizeof(GPUSceneData)) * frameIndex;
 	memcpy(sceneData, &_sceneParameters, sizeof(GPUSceneData));
 	vmaUnmapMemory(_allocator, _sceneParameterBuffer._allocation);
@@ -277,7 +267,6 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject *first, int co
 		objectSSBO[i].modelMatrix = object.transformMatrix;
 	}
 	vmaUnmapMemory(_allocator, get_current_frame().objectBuffer._allocation);
-
 
 	Mesh *lastMesh = nullptr;
 	Material *lastMaterial = nullptr;
@@ -313,6 +302,17 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject *first, int co
 		vkCmdDraw(cmd, object.mesh->_vertices.size(), 1, 0, 0);
 	}
 }
+
+
+void VulkanEngine::DrawViewportOverlays(VkCommandBuffer &cmd)
+{
+	// Draw grid
+	if (_displayGrid == 0)
+	{
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mGridPipeline);
+		vkCmdDraw(cmd, 6, 1, 0, 0);
+	}
+};
 
 
 
@@ -770,29 +770,24 @@ void VulkanEngine::init_pipelines()
 	PipelineBuilder pipelineBuilder;
 
 	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader));
-
 	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, coloredMeshShader));
 
-
-	//we start from just the default empty pipeline layout info
+	// We start from just the default empty pipeline layout info
 	VkPipelineLayoutCreateInfo mesh_pipeline_layout_info = vkinit::pipeline_layout_create_info();
 
-	VkDescriptorSetLayout setLayouts[] = { _globalSetLayout, _objectSetLayout };
-
-	mesh_pipeline_layout_info.setLayoutCount = 2;
-	mesh_pipeline_layout_info.pSetLayouts = setLayouts;
+	std::vector<VkDescriptorSetLayout> setLayouts = {_globalSetLayout, _objectSetLayout};
+	mesh_pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(setLayouts.size());;
+	mesh_pipeline_layout_info.pSetLayouts = setLayouts.data();
 
 	VkPipelineLayout meshPipLayout;
 	VK_CHECK(vkCreatePipelineLayout(_device, &mesh_pipeline_layout_info, nullptr, &meshPipLayout));
 
-
 	//we start from  the normal mesh layout
 	VkPipelineLayoutCreateInfo textured_pipeline_layout_info = mesh_pipeline_layout_info;
 		
-	VkDescriptorSetLayout texturedSetLayouts[] = { _globalSetLayout, _objectSetLayout, _singleTextureSetLayout };
-
-	textured_pipeline_layout_info.setLayoutCount = 3;
-	textured_pipeline_layout_info.pSetLayouts = texturedSetLayouts;
+	std::vector<VkDescriptorSetLayout> texturedSetLayouts = {_globalSetLayout, _objectSetLayout, _singleTextureSetLayout};
+	textured_pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(texturedSetLayouts.size());
+	textured_pipeline_layout_info.pSetLayouts = texturedSetLayouts.data();
 
 	VkPipelineLayout texturedPipeLayout;
 	VK_CHECK(vkCreatePipelineLayout(_device, &textured_pipeline_layout_info, nullptr, &texturedPipeLayout));
@@ -849,11 +844,8 @@ void VulkanEngine::init_pipelines()
 	create_material(meshPipeline, meshPipLayout, "defaultmesh");
 
 	pipelineBuilder._shaderStages.clear();
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader));
-
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, texturedMeshShader));
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertShader));
+	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, texturedMeshShader));
 
 	pipelineBuilder._pipelineLayout = texturedPipeLayout;
 	VkPipeline texPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
@@ -861,39 +853,25 @@ void VulkanEngine::init_pipelines()
 
 
 
-
 	// GRID PIPELINE
 	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, gridVertShader));
 	pipelineBuilder._shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, gridFragShader));
-	// Setup push constants and pipeline layout
-	VkPushConstantRange view_constant
-	{
-		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-		.offset = 0,
-		.size = sizeof(GPUCameraData),
-	};
+
 	VkPipelineLayoutCreateInfo grid_pipeline_layout_info = vkinit::pipeline_layout_create_info();
-	grid_pipeline_layout_info.pPushConstantRanges = &view_constant;
-	grid_pipeline_layout_info.pushConstantRangeCount = 1;
 
-	VkDescriptorSetLayout gridSetLayout[] = { _globalSetLayout, _objectSetLayout };
-
-	grid_pipeline_layout_info.setLayoutCount = 2;
-	grid_pipeline_layout_info.pSetLayouts = gridSetLayout;
+	std::vector<VkDescriptorSetLayout> gridSetLayouts = {_globalSetLayout};
+	grid_pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(gridSetLayouts.size());
+	grid_pipeline_layout_info.pSetLayouts = gridSetLayouts.data();
 
 	VK_CHECK(vkCreatePipelineLayout(_device, &grid_pipeline_layout_info, nullptr, &mGridPipelineLayout));
-
-
 
 	// Hook the push constants layout
 	pipelineBuilder._pipelineLayout = mGridPipelineLayout;
 	mGridPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
 
-
 	#ifdef DEBUG
 	LOG_SUCCESS("{}: Grid pipeline was built successfully.", GetName());
 	#endif
-
 
 
 	vkDestroyShaderModule(_device, meshVertShader, nullptr);
@@ -1126,12 +1104,6 @@ void VulkanEngine::upload_mesh(Mesh& mesh)
 
 
 
-
-
-
-
-
-
 void VulkanEngine::update_scene()
 {
 	mMainCamera.Update();
@@ -1165,7 +1137,7 @@ void VulkanEngine::update_scene()
 
 FrameData &VulkanEngine::get_current_frame()
 {
-	return _frames[_frameNumber % FRAME_OVERLAP];
+	return _frames[mFrameNumber % FRAME_OVERLAP];
 }
 
 
@@ -1451,36 +1423,6 @@ size_t VulkanEngine::pad_uniform_buffer_size(size_t originalSize)
 	}
 	return alignedSize;
 }
-
-
-// VkDescriptorSetLayoutBinding vkinit::descriptorset_layout_binding(VkDescriptorType type, VkShaderStageFlags stageFlags, uint32_t binding)
-// {
-// 	VkDescriptorSetLayoutBinding setbind = {};
-// 	setbind.binding = binding;
-// 	setbind.descriptorCount = 1;
-// 	setbind.descriptorType = type;
-// 	setbind.pImmutableSamplers = nullptr;
-// 	setbind.stageFlags = stageFlags;
-
-// 	return setbind;
-// }
-
-
-// VkWriteDescriptorSet vkinit::write_descriptor_buffer(VkDescriptorType type, VkDescriptorSet dstSet, VkDescriptorBufferInfo* bufferInfo , uint32_t binding)
-// {
-// 	VkWriteDescriptorSet write = {};
-// 	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-// 	write.pNext = nullptr;
-
-// 	write.dstBinding = binding;
-// 	write.dstSet = dstSet;
-// 	write.descriptorCount = 1;
-// 	write.descriptorType = type;
-// 	write.pBufferInfo = bufferInfo;
-
-// 	return write;
-// }
-
 
 
 void VulkanEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function)

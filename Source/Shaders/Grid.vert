@@ -1,17 +1,6 @@
 // We will be using glsl version 4.5 syntax.
 #version 460
 
-// Push constants block.
-layout(push_constant) uniform ViewUniforms
-{
-	mat4 view;
-	mat4 proj;
-	mat4 viewproj;
-	vec3 pos;
-	vec3 nearPoint;
-	vec3 farPoint;
-} view;
-
 
 layout(set = 0, binding = 0) uniform  CameraBuffer
 {
@@ -56,5 +45,6 @@ void main()
 	// far = UnprojectPoint(p.x, p.y, 1.0, view.view, view.proj).xyz; // unprojecting on the far plane
 	// gl_Position = vec4(p, 1.0); // using directly the clipped coordinates
 
-	gl_Position = view.proj * view.view * vec4(gridPlane[gl_VertexIndex].xyz, 1.0);
+	// gl_Position = view.proj * view.view * vec4(gridPlane[gl_VertexIndex].xyz, 1.0);
+	gl_Position = cameraData.proj * cameraData.view * vec4(gridPlane[gl_VertexIndex].xyz, 1.0);
 }
