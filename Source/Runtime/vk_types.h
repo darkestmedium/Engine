@@ -3,6 +3,8 @@
 
 #pragma once
 
+#define DEBUG
+
 #include "Logger.h"
 
 // STD

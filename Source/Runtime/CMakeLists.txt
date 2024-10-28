@@ -12,15 +12,17 @@ add_executable(Engine
 	Logger.h
 	ProgramConfig.h
 	main.cpp
-	vk_engine.cpp
-	vk_engine.h
-	vk_initializers.cpp
-	vk_initializers.h
-	vk_mesh.cpp
-	vk_mesh.h
-	vk_textures.h
-	vk_textures.cpp
 	vk_types.h
+	Vulkan.h
+	Vulkan.cpp
+	vk_engine.h
+	vk_engine.cpp
+	vk_initializers.h
+	vk_initializers.cpp
+	vk_mesh.h
+	vk_mesh.cpp
+	vk_textures.cpp
+	vk_textures.h
 	Camera.h
 	Camera.cpp
 	Transform.h

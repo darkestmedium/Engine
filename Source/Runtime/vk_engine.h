@@ -5,8 +5,8 @@
 
 #include "ProgramConfig.h"
 
-
-#include <vk_types.h>
+#include "Vulkan.h"
+// #include <vk_types.h>
 #include <vk_initializers.h>
 #include <vk_mesh.h>
 
@@ -151,7 +151,6 @@ public:
 	int _displayGrid{ 0 };
 
 	VkExtent2D _windowExtent;
-
 	struct SDL_Window *_window{ nullptr };
 
 	VkInstance _instance;

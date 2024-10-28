@@ -22,13 +22,13 @@ const char *GetName()
 void PrintPlatformStr(void)
 {
 	#if defined(__linux__)
-		LOG_INFO("{}: __linux__ is defined.", GetName());
+		LOG(INFO, "{}: __linux__ is defined.", GetName());
 	#elif defined(_WIN32)
-		LOG_INFO("{}: _WIN32 is defined.", GetName());
+		LOG(INFO, "{}: _WIN32 is defined.", GetName());
 	#elif defined(__APPLE__)
-		LOG_INFO("{}: __APPLE__ is defined.", GetName());
+		LOG(INFO, "{}: __APPLE__ is defined.", GetName());
 	#else
-		LOG_INFO("{}: Unknown platform.", GetName());
+		LOG(INFO, "{}: Unknown platform.", GetName());
 	#endif
 }
 
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 		args.print();  // Prints all variables
 		PrintPlatformStr();
 
-		LOG_INFO("{}: Current working directory: {}", GetName(), std::filesystem::current_path().c_str())
+		LOG(INFO, "{}: Current working directory: {}", GetName(), std::filesystem::current_path().c_str());
 	}
 
 	VulkanEngine engine(args);

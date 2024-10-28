@@ -35,12 +35,12 @@ struct ProgramConfig : public argparse::Args
 			1,  // VK_QUEUE_GRAPHICS_BIT = 0x00000001
 			2048,  // VK_QUEUE_PRESENT_BIT = 0x00000800
 			32,  // VK_QUEUE_VIDEO_DECODE_BIT_KHR = 0x00000020
-				// video queues must also support transfer, and we want a video decode queue
-				4,  // VK_QUEUE_TRANSFER_BIT = 0x00000004
+			// video queues must also support transfer, and we want a video decode queue
+			4,  // VK_QUEUE_TRANSFER_BIT = 0x00000004
 		};
 	}
 
-	std::string &programName = kwarg("pn,programName", "Name of the program, will be displayed in window.").set_default("Vulkan Engine");
+	std::string &programName = kwarg("pn,programName", "Name of the program, will be displayed in window.").set_default("Think Editor");
 	uint32_t &initialWidth   = kwarg("iw,initialWidth", "Initial width of the window.").set_default(1920);
 	uint32_t &initialHeight  = kwarg("ih,initialHeight", "Initial height of the window.").set_default(810);
 

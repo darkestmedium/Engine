@@ -3,10 +3,12 @@
 **Think Engine** is a personal game engine learning repository structured with inspiration from Unreal Engine’s architecture and standards. This project serves as a sandbox for exploring graphics programming, Vulkan API, and the design patterns employed in high-performance engines. The aim is to gain hands-on experience with engine development concepts while building a modular and scalable framework.
 ![ThinkEngine](./Docs/ThinkEngineSplash.png)
 
+
 ## Current State
 
 - **VS Code Integration**: Complete VS Code setup with CMake and custom tasks for configuring, building and debugging the project.
 - **VK Guide Legacy Completion**: Finished implementation based on the legacy version of [Vulkan Guide](https://vkguide.dev/), with ongoing work to add extra chapters and extend functionality.
+
 
 ## TODO / What Needs to Be Done
 

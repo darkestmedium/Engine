@@ -16,7 +16,7 @@ bool vkutil::load_image_from_file(VulkanEngine& engine, const char* file, Alloca
 
 	if (!pixels)
 	{
-		LOG_ERROR("Failed to load texture file {}", file);
+		LOG(ERROR, "Failed to load texture file {}", file);
 		return false;
 	}
 	
@@ -108,7 +108,7 @@ bool vkutil::load_image_from_file(VulkanEngine& engine, const char* file, Alloca
 
 	vmaDestroyBuffer(engine._allocator, stagingBuffer._buffer, stagingBuffer._allocation);
 
-	LOG_SUCCESS("Texture loaded succesfully {}", file);
+	LOG(SUCCESS, "Texture loaded succesfully {}", file);
 
 	outImage = newImage;
 	return true;

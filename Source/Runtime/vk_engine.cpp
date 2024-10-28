@@ -22,7 +22,7 @@
 // Sort the renderables array before rendering by Pipeline and Mesh, to reduce number of binds.
 
 
-#define DEBUG
+// #define DEBUG
 
 
 #ifdef DEBUG
@@ -104,40 +104,26 @@ void VulkanEngine::Deinitialize()
 		vkDeviceWaitIdle(_device);
 
 		_mainDeletionQueue.flush();
-		#ifdef DEBUG
-		LOG_INFO("{}: Deletion queue was flushed.", GetName());
-		#endif
+		LOG(INFO, "{}: Deletion queue was flushed.", GetName());
 
 	  vmaDestroyAllocator(_allocator);
-		#ifdef DEBUG
-		LOG_INFO("{}: Vulkan Memory Allocator was destroyed.", GetName());
-		#endif
+		LOG(INFO, "{}: Vulkan Memory Allocator was destroyed.", GetName());
 
 		vkDestroyDevice(_device, nullptr);
-		#ifdef DEBUG
-		LOG_INFO("{}: Vulkan Logical Device was destroyed.", GetName());
-		#endif
-	
+		LOG(INFO, "{}: Vulkan Logical Device was destroyed.", GetName());
+
 		vkDestroySurfaceKHR(_instance, _surface, nullptr);
-		#ifdef DEBUG
-		LOG_INFO("{}: Vulkan Surface was destroyed.", GetName());
-		#endif
+		LOG(INFO, "{}: Vulkan Surface was destroyed.", GetName());
 
 		vkb::destroy_debug_utils_messenger(_instance, _debug_messenger);
 
 		vkDestroyInstance(_instance, nullptr);
-		#ifdef DEBUG
-		LOG_INFO("{}: Vulkan Instance was destroyed.", GetName());
-		#endif
+		LOG(INFO, "{}: Vulkan Instance was destroyed.", GetName());
 
 		SDL_DestroyWindow(_window);
-		#ifdef DEBUG
-		LOG_INFO("{}: SDL Window was destroyed.", GetName());
-		#endif
+		LOG(INFO, "{}: SDL Window was destroyed.", GetName());
 
-		#ifdef DEBUG
-		LOG_INFO("{}: Exiting application.", GetName());
-		#endif
+		LOG(INFO, "{}: Exiting application.", GetName());
 	}
 }
 
@@ -355,17 +341,10 @@ void VulkanEngine::run()
 
 void VulkanEngine::init_vulkan()
 {
-	// Load Volk
-	if (volkInitialize() != VK_SUCCESS)
+	if (!Vulkan::Initialize())
 	{
-		#ifdef DEBUG
-    LOG_FATAL("{}: WARNING! Volk failed to load.", GetName());
-		#endif
-    return;
-  }
-	#ifdef DEBUG
-	LOG_SUCCESS("{}: Volk loaded successfully.", GetName())
-	#endif
+		return;
+	}
 
 
 	vkb::InstanceBuilder builder;
@@ -412,9 +391,7 @@ void VulkanEngine::init_vulkan()
 	// _gpuProperties = vkbDevice.physical_device.properties;
 	// fmt::println("{}: The GPU has a minimum buffer alignment of {}", GetName(), _gpuProperties.limits.minUniformBufferOffsetAlignment);
 
-	#ifdef DEBUG
-	LOG_SUCCESS("{}: Logical device created successfully.", GetName());
-	#endif
+	LOG(SUCCESS, "{}: Logical device created successfully.", GetName());
 
 	// Get the VkDevice handle used in the rest of a vulkan application
 	_device = vkbDevice.device;
@@ -428,12 +405,6 @@ void VulkanEngine::init_vulkan()
 	_graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
 	_graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 
-	// //initialize the memory allocator
-	// VmaAllocatorCreateInfo allocatorInfo = {};
-	// allocatorInfo.physicalDevice = _chosenGPU;
-	// allocatorInfo.device = _device;
-	// allocatorInfo.instance = _instance;
-	// vmaCreateAllocator(&allocatorInfo, &_allocator);
   VmaVulkanFunctions vulkanFunctions
 	{
     .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
@@ -450,15 +421,11 @@ void VulkanEngine::init_vulkan()
 
   if (vmaCreateAllocator(&allocatorInfo, &_allocator) != VK_SUCCESS)
 	{
-		#ifdef DEBUG
-    LOG_FATAL("{}: ERROR! Failed to create vulkan memory allocator.", GetName());
-		#endif
+    LOG(FATAL, "{}: Failed to create vulkan memory allocator.", GetName());
     return;
   };
 
-	#ifdef DEBUG
-  LOG_SUCCESS("{}: Vulkan Memory Allocator created successfully.", GetName());
-	#endif
+  LOG(SUCCESS, "{}: Vulkan Memory Allocator created successfully.", GetName());
 
 }
 
@@ -712,58 +679,38 @@ void VulkanEngine::init_pipelines()
 	VkShaderModule texturedMeshShader;
 	if (!load_shader_module("./Shaders/textured_lit.frag.spv", &texturedMeshShader))
 	{
-		#ifdef DEBUG
-		LOG_FATAL("{}: Error when building the textured mesh shader", GetName());
-		#endif
+		LOG(FATAL, "{}: Error when building the textured mesh shader", GetName());
 	}
-	#ifdef DEBUG
-	LOG_SUCCESS("{}: Textured mesh shader successsfully loaded.", GetName());
-	#endif
+	LOG(SUCCESS, "{}: Textured mesh shader successsfully loaded.", GetName());
 
 	VkShaderModule coloredMeshShader;
 	if (!load_shader_module("./Shaders/default_lit.frag.spv", &coloredMeshShader))
 	{
-		#ifdef DEBUG
-		LOG_FATAL("{}: Error when building the colored mesh fragment shader module.", GetName());
-		#endif
+		LOG(FATAL, "{}: Error when building the colored mesh fragment shader module.", GetName());
 	}
-	#ifdef DEBUG
-	LOG_SUCCESS("{}: Colored mesh fragment shader succesfully loaded.", GetName());
-	#endif
+	LOG(SUCCESS, "{}: Colored mesh fragment shader succesfully loaded.", GetName());
 
 	VkShaderModule meshVertShader;
 	if (!load_shader_module("./Shaders/tri_mesh_ssbo.vert.spv", &meshVertShader))
 	{
-		#ifdef DEBUG
-		LOG_FATAL("{}: Error when building the tri mesh ssbo vertex shader module.", GetName());
-		#endif
+		LOG(FATAL, "{}: Error when building the tri mesh ssbo vertex shader module.", GetName());
 	}
-	#ifdef DEBUG
-	LOG_SUCCESS("{}: Tri mesh ssbo vertex shader succesfully loaded.", GetName());
-	#endif
+	LOG(SUCCESS, "{}: Tri mesh ssbo vertex shader succesfully loaded.", GetName());
 
 	// GRID PIPELINE
 	VkShaderModule gridFragShader;
 	if (!load_shader_module("./Shaders/Grid.frag.spv", &gridFragShader))
 	{
-		#ifdef DEBUG
-		LOG_FATAL("{}: Error when building the grid fragment shader module.", GetName());
-		#endif
+		LOG(FATAL, "{}: Error when building the grid fragment shader module.", GetName());
 	}
-	#ifdef DEBUG
-	LOG_SUCCESS("{}: Grid fragment shader succesfully loaded.", GetName());
-	#endif
+	LOG(SUCCESS, "{}: Grid fragment shader succesfully loaded.", GetName());
 
 	VkShaderModule gridVertShader;
 	if (!load_shader_module("./Shaders/Grid.vert.spv", &gridVertShader))
 	{
-		#ifdef DEBUG
-		LOG_FATAL("{}: Error when building the grid vertex shader module.", GetName());
-		#endif
+		LOG(FATAL, "{}: Error when building the grid vertex shader module.", GetName());
 	}
-	#ifdef DEBUG
-	LOG_SUCCESS("{}: Grid vertex shader succesfully loaded.", GetName());
-	#endif
+	LOG(SUCCESS, "{}: Grid vertex shader succesfully loaded.", GetName());
 
 	
 	//build the stage-create-info for both vertex and fragment stages. This lets the pipeline know the shader modules per stage
@@ -869,9 +816,7 @@ void VulkanEngine::init_pipelines()
 	pipelineBuilder._pipelineLayout = mGridPipelineLayout;
 	mGridPipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
 
-	#ifdef DEBUG
-	LOG_SUCCESS("{}: Grid pipeline was built successfully.", GetName());
-	#endif
+	LOG(SUCCESS, "{}: Grid pipeline was built successfully.", GetName());
 
 
 	vkDestroyShaderModule(_device, meshVertShader, nullptr);
